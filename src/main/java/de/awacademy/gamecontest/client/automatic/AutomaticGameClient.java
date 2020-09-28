@@ -79,7 +79,7 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
             newGame();
         } else {
             myValue = 2;
-            enemyValue = 2;
+            enemyValue = 1;
             joinGame(otherPlayerName);
         }
         viewGame(getUserName());
@@ -89,6 +89,7 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
     public void playerRegistered(Player player) {
         if (player1 == null) {
             player1 = player;
+            move(2);
         } else {
             player2 = player;
             if (iAmYellow) {
@@ -117,6 +118,7 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
     private Map.Entry<Integer, Integer> checkNextMoves(int[][] fields, int moveCount, Map<Integer, Integer> firstNodeValues, Map<Integer, Integer> secondNodeValues, Map<Integer, Integer> finalNodeValues) {
         if (stopRecursion) return null;
         Map<Integer, Integer> possibleMoves = findPossibleMoves(fields);
+
 
         Map.Entry<Integer, Integer> bestMove = null;
         for (int col : possibleMoves.keySet()) {
@@ -201,6 +203,20 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
             return false;
         }
     }
+
+    // Function select an element base on index
+    // and return an element
+    public int getRandomCol(List<Integer> list)
+    {
+        return list.get(random.nextInt(list.size()));
+    }
+
+//    if (possibleMoves.isEmpty()) {
+//        System.out.println("------ Goodbye -----");
+//        List<Integer> nonFullRows = findNonNullRows(fields);
+//        move(getRandomCol(nonFullRows));
+//        break;
+//    }
 
     private Map.Entry<Integer, Integer> findValueOfBestMove(Map<Integer, Integer> values, int moveCount, Map.Entry<Integer, Integer> bestMove) {
         bestMove = checkValues(values, moveCount);
@@ -475,19 +491,24 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
     }
 
     private Map<Integer, Integer> findPossibleMoves(int[][] fields) {
-        List<Integer> nonFullColumns = new ArrayList<>();
+        List<Integer> nonFullColumns = findNonNullRows(fields);
         Map<Integer, Integer> possibleMoves = new HashMap<>();
-        for (int i = 0; i < GameConstants.COL_COUNT - 1; i++) {
-            if (fields[GameConstants.ROW_COUNT - 1][i] != 1 && fields[GameConstants.ROW_COUNT - 1][i] != 2) {
-                nonFullColumns.add(i);
-            }
-        }
         for (int col: nonFullColumns) {
             if (!losingMoves.contains(col)) {
                 possibleMoves.put(col, getRowForThisMove(fields, col));
             }
         }
         return possibleMoves;
+    }
+
+    private List<Integer> findNonNullRows(int[][] fields) {
+        List<Integer> nonFullColumns = new ArrayList<>();
+        for (int i = 0; i < GameConstants.COL_COUNT - 1; i++) {
+            if (fields[GameConstants.ROW_COUNT - 1][i] != 1 && fields[GameConstants.ROW_COUNT - 1][i] != 2) {
+                nonFullColumns.add(i);
+            }
+        }
+        return nonFullColumns;
     }
 
     private int getRowForThisMove(int[][] fields, int col) {
