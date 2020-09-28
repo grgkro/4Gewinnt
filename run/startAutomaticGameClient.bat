@@ -1,0 +1,1 @@
+java -cp lib/GameClient-0.1-SNAPSHOT.jar;lib/Java-WebSocket-1.5.1.jar;lib/slf4j-api-1.7.30.jar;lib/slf4j-log4j12-1.7.30.jar;lib/log4j-1.2.17.jar de.awacademy.gamecontest.client.automatic.AutomaticGameClient Berta geheim Anton
