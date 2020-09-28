@@ -118,22 +118,26 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
         for (int col : possibleMoves.keySet()) {
             System.out.println("Going to check move (row = " + possibleMoves.get(col) + ", col = " + col + ") as " + (moveCount + 1) + ". move.");
             fields = addMove(fields, moveCount, col, possibleMoves);
-            if (moveCount < numCalculateMovesAhead) {
+
                 if (moveCount == 0) {
                     firstMoveRow = latestMoveRow;
                     firstMoveCol = col;
+                    if(gameIsWon(fields, possibleMoves.get(col), col)) {
+                        move(col);
+                        break;
+                    }
                     firstNodeValues.put(col, checkNextMoves(fields, moveCount + 1, firstNodeValues, secondNodeValues, finalNodeValues).getValue());
                 } else if (moveCount == 1) {
                     secondMoveRow = latestMoveRow;
                     secondMoveCol = col;
                     secondNodeValues.put(col, checkNextMoves(fields, moveCount + 1, firstNodeValues, secondNodeValues, finalNodeValues).getValue());
+                } else if (moveCount == numCalculateMovesAhead) {
+                    int value = evaluate(fields, possibleMoves.get(col), col, firstMoveRow, firstMoveCol);
+                    finalNodeValues.put(col, value);
+                    System.out.println("value: " + value);
+                    fields = removeMove(fields, latestMoveRow, col, possibleMoves);
                 }
-            } else if (moveCount == numCalculateMovesAhead) {
-                int value = evaluate(fields, possibleMoves.get(col), col);
-                finalNodeValues.put(col, value);
-                System.out.println("value: " + value);
-                fields = removeMove(fields, latestMoveRow, col, possibleMoves);
-            }
+
         }
         // Auswertung:
 
@@ -153,6 +157,14 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
         }
 
         return bestMove;
+    }
+
+    private boolean gameIsWon(int[][] fields, int row, int col) {
+        if (checkCombos(fields, row, col, 0) >= 500_000) {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     private Map.Entry<Integer, Integer> findValueOfBestMove(Map<Integer, Integer> values, int moveCount, Map.Entry<Integer, Integer> bestMove) {
@@ -194,9 +206,10 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
     }
 
 
-    private int evaluate(int[][] fields, int row, int col) {
+    private int evaluate(int[][] fields, int row, int col, int firstMoveRow, int firstMoveCol) {
         int value = 0;
         value = checkCombos(fields, row, col, value);
+
         return value;
     }
 
