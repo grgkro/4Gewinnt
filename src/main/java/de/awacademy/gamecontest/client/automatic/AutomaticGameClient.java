@@ -34,6 +34,8 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
     private int secondMoveRow;
     private int secondMoveCol;
     private int latestMoveRow;
+    private boolean stopRecursion;
+    List<Integer> losingMoves = new ArrayList();
 
 
 
@@ -113,7 +115,9 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
     }
 
     private Map.Entry<Integer, Integer> checkNextMoves(int[][] fields, int moveCount, Map<Integer, Integer> firstNodeValues, Map<Integer, Integer> secondNodeValues, Map<Integer, Integer> finalNodeValues) {
+        if (stopRecursion) return null;
         Map<Integer, Integer> possibleMoves = findPossibleMoves(fields);
+
         Map.Entry<Integer, Integer> bestMove = null;
         for (int col : possibleMoves.keySet()) {
             System.out.println("Going to check move (row = " + possibleMoves.get(col) + ", col = " + col + ") as " + (moveCount + 1) + ". move.");
@@ -123,16 +127,39 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
                     firstMoveRow = latestMoveRow;
                     firstMoveCol = col;
                     if(gameIsWon(fields, possibleMoves.get(col), col)) {
+                        System.out.println("------------Game can be won immediately in " + col + " --------------");
                         move(col);
+                        fields = removeMove(fields, firstMoveRow, col, possibleMoves);
+                        stopRecursion = true;
                         break;
                     }
-                    firstNodeValues.put(col, checkNextMoves(fields, moveCount + 1, firstNodeValues, secondNodeValues, finalNodeValues).getValue());
+                    try {
+                        firstNodeValues.put(col, checkNextMoves(fields, moveCount + 1, firstNodeValues, secondNodeValues, finalNodeValues).getValue());
+                    } catch (NullPointerException e) {
+                        return null;
+                    }
+
                 } else if (moveCount == 1) {
                     secondMoveRow = latestMoveRow;
                     secondMoveCol = col;
+                    if(gameIsLost(fields, possibleMoves.get(col), col)) {
+                        fields = removeMove(fields, secondMoveRow, col, possibleMoves);
+                        fields = removeMove(fields, firstMoveRow, col, possibleMoves);
+                        System.out.println("------------....Game would have been lost in " + col + " --------------");
+                        if (col == firstMoveCol) {  // wenn col == firstMoveCol, bedeutet dass, dass der Gewinnerzug vom Gegner überhaupt erst möglich wurde durch setzen des Steines in der Reihe. Wir wollen dann gerade den Zug nicht machen.
+                            System.out.println("------------Removed move in " + col + " from possibleMoves --------------");
+                            possibleMoves.remove(col);
+                            losingMoves.add(col);
+                            break;
+                        }
+                        System.out.println("------------The move in " + col + " is needed --------------");
+                        move(col);
+                        stopRecursion = true;
+                        break;
+                    }
                     secondNodeValues.put(col, checkNextMoves(fields, moveCount + 1, firstNodeValues, secondNodeValues, finalNodeValues).getValue());
                 } else if (moveCount == numCalculateMovesAhead) {
-                    int value = evaluate(fields, possibleMoves.get(col), col, firstMoveRow, firstMoveCol);
+                    int value = evaluate(fields, possibleMoves.get(col), col, firstMoveRow);
                     finalNodeValues.put(col, value);
                     System.out.println("value: " + value);
                     fields = removeMove(fields, latestMoveRow, col, possibleMoves);
@@ -140,7 +167,7 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
 
         }
         // Auswertung:
-
+        if (stopRecursion) return null;
         switch (moveCount) {
             case 0:
                 bestMove = findValueOfBestMove(firstNodeValues, moveCount, bestMove);
@@ -159,6 +186,14 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
         return bestMove;
     }
 
+    private boolean gameIsLost(int[][] fields, int row, int col) {
+        if (checkEnemiesCombos(fields, row, col, 0) > 500_000 ) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
     private boolean gameIsWon(int[][] fields, int row, int col) {
         if (checkCombos(fields, row, col, 0) >= 500_000) {
             return true;
@@ -169,7 +204,7 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
 
     private Map.Entry<Integer, Integer> findValueOfBestMove(Map<Integer, Integer> values, int moveCount, Map.Entry<Integer, Integer> bestMove) {
         bestMove = checkValues(values, moveCount);
-        System.out.println("Best Move for Zug: " + (moveCount + 1) + " is: " + bestMove.getKey() + " with value: " + bestMove.getValue());
+//        System.out.println("Best Move for Zug: " + (moveCount + 1) + " is: " + bestMove.getKey() + " with value: " + bestMove.getValue());
         return bestMove;
     }
 
@@ -190,7 +225,7 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
                 minEntry = entry;
             }
         }
-        System.out.println("min value out of values: " + values.values().toString() + " is: " + minEntry + ". From the last Block of moves, the Enemy should make the move which belongs to this value: " + values.toString());
+//        System.out.println("min value out of values: " + values.values().toString() + " is: " + minEntry + ". From the last Block of moves, the Enemy should make the move which belongs to this value: " + values.toString());
         return minEntry;
     }
 
@@ -205,12 +240,183 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
         return maxEntry;
     }
 
-
-    private int evaluate(int[][] fields, int row, int col, int firstMoveRow, int firstMoveCol) {
+    private int checkEnemiesCombos(int[][] fields, int row, int col, int firstMoveRow) {
         int value = 0;
-        value = checkCombos(fields, row, col, value);
-
+        value = checkEnemyHorizontally(fields, row, firstMoveRow, col, value);
+        value = checkEnemyVertically(fields, row, firstMoveRow, col, value);
+        value = checkEnemyDiagonallyLeftDownToRightUp(fields, row, firstMoveRow, col, value);
+        value = checkEnemyDiagonallyLeftUpToRightDown(fields, value);
         return value;
+    }
+
+    private int checkEnemyDiagonallyLeftUpToRightDown(int[][] fields, int value) {
+        for (int y = (GameConstants.ROW_COUNT - 1); y >= 0 ; y--) {
+            for (int x = 0; x <= (GameConstants.COL_COUNT / 2); x++) {
+                int comboLength = 0;
+                int j = y;
+                // go through the four columns, begin at the startCol and end at the target col + abs(offset - 3) -> zb offset = 2 (wir fangen 2 links vom gesetzten Stein an. -> wir enden eins abs(2 - 3) rechts vom gesetzten Stein.
+                for (int i = x; i <= (x + 3); i++) {
+                    if (j >= 0) {
+                        if (fields[j][i] == myValue) break;
+                        if (fields[j][i] == enemyValue) comboLength++;
+                        j--;
+                    } else {
+                        break;
+                    }
+                }
+                value = value + evaluateCombo((comboLength));
+            }
+        }
+        return value;
+    }
+
+    private int checkEnemyDiagonallyLeftDownToRightUp(int[][] fields, int row, int firstMoveRow, int col, int value) {
+        for (int y = 0; y <= (Math.max(row, firstMoveRow)) ; y++) {
+            for (int x = 0; x <= (GameConstants.COL_COUNT / 2); x++) {
+                int comboLength = 0;
+                int j = y;
+                // go through the four columns, begin at the startCol and end at the target col + abs(offset - 3) -> zb offset = 2 (wir fangen 2 links vom gesetzten Stein an. -> wir enden eins abs(2 - 3) rechts vom gesetzten Stein.
+                for (int i = x; i <= (x + 3); i++) {
+                    if (j < 6) {
+                        if (fields[j][i] == myValue) break;
+                        if (fields[j][i] == enemyValue) comboLength++;
+                        j++;
+                    } else {
+                        break;
+                    }
+
+                }
+                value = value + evaluateCombo((comboLength));
+            }
+        }
+        return value;
+    }
+
+    private int checkEnemyVertically(int[][] fields, int row, int firstMoveRow, int col, int value) {
+        for (int x = 0; x < GameConstants.COL_COUNT ; x++) {
+            for (int y = 0; y <= (Math.max(row, firstMoveRow)); y++) {
+                int comboLength = 0;
+                // go through the four columns, begin at the startCol and end at the target col + abs(offset - 3) -> zb offset = 2 (wir fangen 2 links vom gesetzten Stein an. -> wir enden eins abs(2 - 3) rechts vom gesetzten Stein.
+
+                for (int i = y; i <= (y + 3); i++) {
+                    if (i < 6) {
+                        if (fields[i][x] == myValue) break;
+                        if (fields[i][x] == enemyValue) comboLength++;
+                    } else {
+                        break;
+                    }
+
+                }
+                value = value + evaluateCombo((comboLength));
+            }
+        }
+        return value;
+    }
+
+    private int checkEnemyHorizontally(int[][] fields, int row, int firstMoveRow, int col, int value) {
+        for (int y = 0; y <= (Math.max(row, firstMoveRow)) ; y++) {
+            for (int x = 0; x <= (GameConstants.COL_COUNT / 2); x++) {
+                int comboLength = 0;
+                // go through the four columns, begin at the startCol and end at the target col + abs(offset - 3) -> zb offset = 2 (wir fangen 2 links vom gesetzten Stein an. -> wir enden eins abs(2 - 3) rechts vom gesetzten Stein.
+
+                for (int i = x; i <= (x + 3); i++) {
+                    if (fields[y][i] == myValue) break;
+                    if (fields[y][i] == enemyValue) comboLength++;
+                }
+                value = value + evaluateCombo((comboLength));
+            }
+        }
+        return value;
+    }
+
+    private int evaluate(int[][] fields, int row, int col, int firstMoveRow) {
+        int value = 0;
+        value = checkCombosHorizontally(fields, row, firstMoveRow, col, value);
+        value = checkCombosVertically(fields, row, firstMoveRow, col, value);
+        value = checkCombosDiagonallyLeftDownToRightUp(fields, row, firstMoveRow, col, value);
+        value = checkCombosDiagonallyLeftUpToRightDown(fields, value);
+        return value;
+    }
+
+    private int checkCombosDiagonallyLeftUpToRightDown(int[][] fields, int value) {
+        for (int y = (GameConstants.ROW_COUNT - 1); y >= 0 ; y--) {
+            for (int x = 0; x <= (GameConstants.COL_COUNT / 2); x++) {
+                int comboLength = 0;
+                int j = y;
+                // go through the four columns, begin at the startCol and end at the target col + abs(offset - 3) -> zb offset = 2 (wir fangen 2 links vom gesetzten Stein an. -> wir enden eins abs(2 - 3) rechts vom gesetzten Stein.
+                for (int i = x; i <= (x + 3); i++) {
+                    if (j >= 0) {
+                        if (fields[j][i] == myValue) comboLength++;
+                        if (fields[j][i] == enemyValue) break;
+                        j--;
+                    } else {
+                        break;
+                    }
+                }
+                value = value + evaluateCombo((comboLength));
+            }
+        }
+        return value;
+    }
+
+    private int checkCombosDiagonallyLeftDownToRightUp(int[][] fields, int row, int firstMoveRow, int col, int value) {
+        for (int y = 0; y <= (Math.max(row, firstMoveRow)) ; y++) {
+            for (int x = 0; x <= (GameConstants.COL_COUNT / 2); x++) {
+                int comboLength = 0;
+                int j = y;
+                // go through the four columns, begin at the startCol and end at the target col + abs(offset - 3) -> zb offset = 2 (wir fangen 2 links vom gesetzten Stein an. -> wir enden eins abs(2 - 3) rechts vom gesetzten Stein.
+                for (int i = x; i <= (x + 3); i++) {
+                    if (j < 6) {
+                        if (fields[j][i] == myValue) comboLength++;
+                        if (fields[j][i] == enemyValue) break;
+                        j++;
+                    } else {
+                        break;
+                    }
+
+                }
+                value = value + evaluateCombo((comboLength));
+            }
+        }
+        return value;
+    }
+
+    private int checkCombosVertically(int[][] fields, int row, int firstMoveRow, int col, int value) {
+        for (int x = 0; x < GameConstants.COL_COUNT ; x++) {
+            for (int y = 0; y <= (Math.max(row, firstMoveRow)); y++) {
+                int comboLength = 0;
+                // go through the four columns, begin at the startCol and end at the target col + abs(offset - 3) -> zb offset = 2 (wir fangen 2 links vom gesetzten Stein an. -> wir enden eins abs(2 - 3) rechts vom gesetzten Stein.
+
+                for (int i = y; i <= (y + 3); i++) {
+                    if (i < 6) {
+                        if (fields[i][x] == myValue) comboLength++;
+                        if (fields[i][x] == enemyValue) break;
+                    } else {
+                        break;
+                    }
+
+                }
+                value = value + evaluateCombo((comboLength));
+            }
+        }
+        return value;
+    }
+
+    private int checkCombosHorizontally(int[][] fields, int row, int firstMoveRow, int col, int value) {
+
+        for (int y = 0; y <= (Math.max(row, firstMoveRow)) ; y++) {
+            for (int x = 0; x <= (GameConstants.COL_COUNT / 2); x++) {
+                int comboLength = 0;
+                // go through the four columns, begin at the startCol and end at the target col + abs(offset - 3) -> zb offset = 2 (wir fangen 2 links vom gesetzten Stein an. -> wir enden eins abs(2 - 3) rechts vom gesetzten Stein.
+
+                    for (int i = x; i <= (x + 3); i++) {
+                        if (fields[y][i] == myValue) comboLength++;
+                        if (fields[y][i] == enemyValue) break;
+                    }
+                    value = value + evaluateCombo((comboLength));
+            }
+        }
+       return value;
     }
 
     private int checkCombos(int[][] fields, int row, int col, int value) {
@@ -277,7 +483,9 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
             }
         }
         for (int col: nonFullColumns) {
-            possibleMoves.put(col, getRowForThisMove(fields, col));
+            if (!losingMoves.contains(col)) {
+                possibleMoves.put(col, getRowForThisMove(fields, col));
+            }
         }
         return possibleMoves;
     }
