@@ -100,23 +100,21 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
         fields[row][col] = (color == PlayerColor.YELLOW ? 1 : 2);
         if ((iAmYellow && status == GameStatus.WAIT_FOR_YELLOW_MOVE)
                 || (!iAmYellow && status == GameStatus.WAIT_FOR_RED_MOVE)) {
-            makeMove();
+            startRecursion();
         }
     }
 
-    public void makeMove() {
+    public void startRecursion() {
         int moveCount = 0;
-        tryMoves(fields, moveCount);
-    }
-
-    private int tryMoves(int[][] fields, int moveCount) {
-        Map<Integer, Integer> possibleMoves = findPossibleMoves(fields);
-//        Map<Integer, Integer> possibleMoves = new HashMap<>();  // col, row
-//        possibleMoves.put(0,0);
-//        possibleMoves.put(1,0);
         Map<Integer, Integer> firstNodeValues = new HashMap<>();   // first Integer (Key) = col of that move, second Integer (value) = the calculated value of that move. exp. (2, 50)
         Map<Integer, Integer> secondNodeValues = new HashMap<>();   // first Integer (Key) = col of that move, second Integer (value) = the calculated value of that move. exp. (2, 50)
         Map<Integer, Integer> finalNodeValues = new HashMap<>();   // first Integer (Key) = col of that move, second Integer (value) = the calculated value of that move. exp. (2, 50)
+        checkNextMoves(fields, moveCount, firstNodeValues, secondNodeValues, finalNodeValues);
+    }
+
+    private int checkNextMoves(int[][] fields, int moveCount, Map<Integer, Integer> firstNodeValues, Map<Integer, Integer> secondNodeValues, Map<Integer, Integer> finalNodeValues) {
+        Map<Integer, Integer> possibleMoves = findPossibleMoves(fields);
+
         int[][] copiedFields = fields;
 
         for (int col : possibleMoves.keySet()) {
@@ -126,17 +124,16 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
                 if (moveCount == 0) {
                     firstMoveRow = latestMoveRow;
                     firstMoveCol = col;
-                    firstNodeValues.put(col, tryMoves(copiedFields, moveCount + 1));
+                    firstNodeValues.put(col, checkNextMoves(copiedFields, moveCount + 1, firstNodeValues, secondNodeValues, finalNodeValues));
                 } else if (moveCount == 1) {
                     secondMoveRow = latestMoveRow;
                     secondMoveCol = col;
-                    secondNodeValues.put(col, tryMoves(copiedFields, moveCount + 1));
+                    secondNodeValues.put(col, checkNextMoves(copiedFields, moveCount + 1, firstNodeValues, secondNodeValues, finalNodeValues));
                 }
             } else if (moveCount == numCalculateMovesAhead) {
                 int value = evaluate(copiedFields, possibleMoves.get(col), col);
                 finalNodeValues.put(col, value);
                 System.out.println("value: " + value);
-//                moveCount = moveCount - 1; // we reached the end of one move-branch and will start at root again.
                 copiedFields = removeMove(copiedFields, latestMoveRow, col, possibleMoves);
             }
         }
