@@ -112,58 +112,53 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
         checkNextMoves(fields, moveCount, firstNodeValues, secondNodeValues, finalNodeValues);
     }
 
-    private int checkNextMoves(int[][] fields, int moveCount, Map<Integer, Integer> firstNodeValues, Map<Integer, Integer> secondNodeValues, Map<Integer, Integer> finalNodeValues) {
+    private Map.Entry<Integer, Integer> checkNextMoves(int[][] fields, int moveCount, Map<Integer, Integer> firstNodeValues, Map<Integer, Integer> secondNodeValues, Map<Integer, Integer> finalNodeValues) {
         Map<Integer, Integer> possibleMoves = findPossibleMoves(fields);
-
-        int[][] copiedFields = fields;
-
+        Map.Entry<Integer, Integer> bestMove = null;
         for (int col : possibleMoves.keySet()) {
             System.out.println("Going to check move (row = " + possibleMoves.get(col) + ", col = " + col + ") as " + (moveCount + 1) + ". move.");
-            copiedFields = addMove(copiedFields, moveCount, col, possibleMoves);
+            fields = addMove(fields, moveCount, col, possibleMoves);
             if (moveCount < numCalculateMovesAhead) {
                 if (moveCount == 0) {
                     firstMoveRow = latestMoveRow;
                     firstMoveCol = col;
-                    firstNodeValues.put(col, checkNextMoves(copiedFields, moveCount + 1, firstNodeValues, secondNodeValues, finalNodeValues));
+                    firstNodeValues.put(col, checkNextMoves(fields, moveCount + 1, firstNodeValues, secondNodeValues, finalNodeValues).getValue());
                 } else if (moveCount == 1) {
                     secondMoveRow = latestMoveRow;
                     secondMoveCol = col;
-                    secondNodeValues.put(col, checkNextMoves(copiedFields, moveCount + 1, firstNodeValues, secondNodeValues, finalNodeValues));
+                    secondNodeValues.put(col, checkNextMoves(fields, moveCount + 1, firstNodeValues, secondNodeValues, finalNodeValues).getValue());
                 }
             } else if (moveCount == numCalculateMovesAhead) {
-                int value = evaluate(copiedFields, possibleMoves.get(col), col);
+                int value = evaluate(fields, possibleMoves.get(col), col);
                 finalNodeValues.put(col, value);
                 System.out.println("value: " + value);
-                copiedFields = removeMove(copiedFields, latestMoveRow, col, possibleMoves);
+                fields = removeMove(fields, latestMoveRow, col, possibleMoves);
             }
         }
         // Auswertung:
-        int bestMoveValue = 0;
+
         switch (moveCount) {
             case 0:
-                bestMoveValue = findValueOfBestMove(firstNodeValues, moveCount);
+                bestMove = findValueOfBestMove(firstNodeValues, moveCount, bestMove);
+                move(bestMove.getKey());
                 break;
             case 1:
-                bestMoveValue = findValueOfBestMove(secondNodeValues, moveCount);
-                copiedFields = removeMove(copiedFields, firstMoveRow, firstMoveCol, possibleMoves);
+                bestMove = findValueOfBestMove(secondNodeValues, moveCount, bestMove);
+                removeMove(fields, firstMoveRow, firstMoveCol, possibleMoves);
                 break;
             case 2:
-                bestMoveValue = findValueOfBestMove(finalNodeValues, moveCount);
-                copiedFields = removeMove(copiedFields, secondMoveRow, secondMoveCol, possibleMoves);
+                bestMove = findValueOfBestMove(finalNodeValues, moveCount, bestMove);
+                removeMove(fields, secondMoveRow, secondMoveCol, possibleMoves);
                 break;
         }
-        System.out.println(fields.toString());
-        return bestMoveValue;
+
+        return bestMove;
     }
 
-    private int findValueOfBestMove(Map<Integer, Integer> values, int moveCount) {
-        Map.Entry<Integer, Integer> bestMove = checkValues(values, moveCount);
-        System.out.println("Best Move for Zug: " + moveCount + 1 + " is: " + bestMove.getKey() + " with value: " + bestMove.getValue());
-        if (moveCount == 0) {
-            move(bestMove.getKey()); //this doesnt work... it will continue and then move again.
-        }
-        moveCount = moveCount - 1;
-        return bestMove.getValue();
+    private Map.Entry<Integer, Integer> findValueOfBestMove(Map<Integer, Integer> values, int moveCount, Map.Entry<Integer, Integer> bestMove) {
+        bestMove = checkValues(values, moveCount);
+        System.out.println("Best Move for Zug: " + (moveCount + 1) + " is: " + bestMove.getKey() + " with value: " + bestMove.getValue());
+        return bestMove;
     }
 
 
@@ -216,11 +211,11 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
     private int checkCombo(int[][] fields, int row, int col, int value, int offset) {
         int startCol = col - offset;
         if (startCol < 0) return value;
-        value = evaluateCombo(getComboLength(startCol, row, col, offset));
+        value = evaluateCombo(getComboLength(fields, startCol, row, col, offset));
         return value;
     }
 
-    private int getComboLength(int startCol, int row, int col, int offset) {
+    private int getComboLength(int[][] fields, int startCol, int row, int col, int offset) {
         int comboLength = 0;
         // go through the four columns, begin at the startCol and end at the target col + abs(offset - 3) -> zb offset = 2 (wir fangen 2 links vom gesetzten Stein an. -> wir enden eins abs(2 - 3) rechts vom gesetzten Stein.
         if (col + abs(offset - 3) < GameConstants.COL_COUNT) {
