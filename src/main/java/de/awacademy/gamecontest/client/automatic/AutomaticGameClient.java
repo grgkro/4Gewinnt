@@ -131,7 +131,7 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
 
         Map.Entry<Integer, Integer> bestMove = null;
 
-        fields = tryEachPossibleMove(fields, possibleMoves, moveCount);
+        tryEachPossibleMove(fields, possibleMoves, moveCount);
 
         if (stopRecursion) {   // we could have moved in tryEachPossibleMove(), so we need to check again, if recursion should be stopped
             return null;
@@ -143,10 +143,10 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
         return bestMove;
     }
 
-    private int[][] tryEachPossibleMove(int[][] fields, Map<Integer, Integer> possibleMoves, int moveCount) {
+    private void tryEachPossibleMove(int[][] fields, Map<Integer, Integer> possibleMoves, int moveCount) {
         for (int col : possibleMoves.keySet()) {
             System.out.println("Going to check move (row = " + possibleMoves.get(col) + ", col = " + col + ") as " + (moveCount + 1) + ". move.");
-            fields = addMove(fields, moveCount, col, possibleMoves);
+            addMove(fields, moveCount, col, possibleMoves);
 
             if (moveCount == 0) {
                 firstMoveRow = latestMoveRow;
@@ -154,7 +154,7 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
                 if(gameIsWon(fields, possibleMoves.get(col), col)) {
                     System.out.println("------------Game can be won immediately in " + col + " --------------");
                     move(col);
-                    fields = removeMove(fields, firstMoveRow, col, possibleMoves);
+                    removeMove(fields, firstMoveRow, col, possibleMoves);
                     stopRecursion = true;
                     break;
                 }
@@ -162,37 +162,39 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
                     firstNodeValues.put(col, checkNextMoves(fields, moveCount + 1).getValue());
                 } catch (NullPointerException e) {
                     System.out.println(e);
-                    return null;
+                    return;
                 }
 
             } else if (moveCount == 1) {
                 secondMoveRow = latestMoveRow;
                 secondMoveCol = col;
                 if(gameIsLost(fields, possibleMoves.get(col), col)) {
-                    fields = removeMove(fields, secondMoveRow, col, possibleMoves);
-                    fields = removeMove(fields, firstMoveRow, col, possibleMoves);
-                    System.out.println("------------....Game would have been lost in " + col + " --------------");
-                    if (col == firstMoveCol) {  // wenn col == firstMoveCol, bedeutet dass, dass der Gewinnerzug vom Gegner überhaupt erst möglich wurde durch setzen meines davorigen Steines in der Reihe. Wir wollen dann gerade den Zug nicht machen.
-                        System.out.println("------------Removed move in " + col + " from possibleMoves --------------");
-                        possibleMoves.remove(col);
-                        losingMoves.add(col);
-                        break;
-                    } else {
-                        System.out.println("------------Enemy can win -> The move in " + col + " is needed immediately, no need to check all the other possible moves --------------");
-                        move(col);
-                        stopRecursion = true;
-                        break;
-                    }
+                   hinderEnemyFromCompletingFour(fields, col, possibleMoves);
+                   break;
                 }
                 secondNodeValues.put(col, checkNextMoves(fields, moveCount + 1).getValue());
             } else if (moveCount == numCalculateMovesAhead) {
-                int value = evaluate(fields, possibleMoves.get(col), col, firstMoveRow);
+                int value = checkMyCombos(fields, possibleMoves.get(col), col);
                 thirdNodeValues.put(col, value);
                 System.out.println("value: " + value);
-                fields = removeMove(fields, latestMoveRow, col, possibleMoves);
+                removeMove(fields, latestMoveRow, col, possibleMoves);
             }
         }
-        return fields;
+    }
+
+    private void hinderEnemyFromCompletingFour(int[][] fields, int col, Map<Integer, Integer> possibleMoves) {
+        removeMove(fields, secondMoveRow, col, possibleMoves);
+        removeMove(fields, firstMoveRow, col, possibleMoves);
+        System.out.println("------------....Game would have been lost in " + col + " --------------");
+        if (col == firstMoveCol) {  // wenn col == firstMoveCol, bedeutet dass, dass der Gewinnerzug vom Gegner überhaupt erst möglich wurde durch setzen meines davorigen Steines in der Reihe. Wir wollen dann gerade den Zug nicht machen.
+            System.out.println("------------Removed move in " + col + " from possibleMoves --------------");
+            possibleMoves.remove(col);
+            losingMoves.add(col);
+        } else {
+            System.out.println("------------Enemy can win -> The move in " + col + " is needed immediately, no need to check all the other possible moves --------------");
+            move(col);
+            stopRecursion = true;
+        }
     }
 
     private Map.Entry<Integer, Integer> findAndMakeBestMove(int[][] fields, Map<Integer, Integer> possibleMoves, Map.Entry<Integer, Integer> bestMove, int moveCount) {
@@ -222,7 +224,7 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
     }
 
     private boolean gameIsWon(int[][] fields, int row, int col) {
-        if (checkCombos(fields, row, col, 0) >= 500_000) {
+        if (checkMyCombos(fields, row, col) >= 500_000) {
             return true;
         } else {
             return false;
@@ -370,7 +372,7 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
         return value;
     }
 
-    private int evaluate(int[][] fields, int row, int col, int firstMoveRow) {
+    private int checkMyCombos(int[][] fields, int row, int col) {
         int value = 0;
         value = checkCombosHorizontally(fields, row, firstMoveRow, col, value);
         value = checkCombosVertically(fields, row, firstMoveRow, col, value);
@@ -460,33 +462,33 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
        return value;
     }
 
-    private int checkCombos(int[][] fields, int row, int col, int value) {
-        value = checkCombo(fields, row, col, value, 3);
-        value = value + checkCombo(fields, row, col, value, 2);
-        value = value + checkCombo(fields, row, col, value, 1);
-        value = value + checkCombo(fields, row, col, value, 0);
-        return value;
-    }
-
-    private int checkCombo(int[][] fields, int row, int col, int value, int offset) {
-        int startCol = col - offset;
-        if (startCol < 0) return value;
-        value = evaluateCombo(getComboLength(fields, startCol, row, col, offset));
-        return value;
-    }
-
-    private int getComboLength(int[][] fields, int startCol, int row, int col, int offset) {
-        int comboLength = 0;
-        // go through the four columns, begin at the startCol and end at the target col + abs(offset - 3) -> zb offset = 2 (wir fangen 2 links vom gesetzten Stein an. -> wir enden eins abs(2 - 3) rechts vom gesetzten Stein.
-        if (col + abs(offset - 3) < GameConstants.COL_COUNT) {
-            for (int i = startCol; i <= col + abs(offset - 3); i++) {
-
-                if (fields[row][i] == myValue) comboLength++;
-                if (fields[row][i] == enemyValue) break;
-            }
-        }
-        return comboLength;
-    }
+//    private int checkCombos(int[][] fields, int row, int col, int value) {
+//        value = checkCombo(fields, row, col, value, 3);
+//        value = value + checkCombo(fields, row, col, value, 2);
+//        value = value + checkCombo(fields, row, col, value, 1);
+//        value = value + checkCombo(fields, row, col, value, 0);
+//        return value;
+//    }
+//
+//    private int checkCombo(int[][] fields, int row, int col, int value, int offset) {
+//        int startCol = col - offset;
+//        if (startCol < 0) return value;
+//        value = evaluateCombo(getComboLength(fields, startCol, row, col, offset));
+//        return value;
+//    }
+//
+//    private int getComboLength(int[][] fields, int startCol, int row, int col, int offset) {
+//        int comboLength = 0;
+//        // go through the four columns, begin at the startCol and end at the target col + abs(offset - 3) -> zb offset = 2 (wir fangen 2 links vom gesetzten Stein an. -> wir enden eins abs(2 - 3) rechts vom gesetzten Stein.
+//        if (col + abs(offset - 3) < GameConstants.COL_COUNT) {
+//            for (int i = startCol; i <= col + abs(offset - 3); i++) {
+//
+//                if (fields[row][i] == myValue) comboLength++;
+//                if (fields[row][i] == enemyValue) break;
+//            }
+//        }
+//        return comboLength;
+//    }
 
     private int evaluateCombo(int comboLength) {
         int comboValue = 0;
@@ -497,22 +499,19 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
     }
 
     // add the move in this col to copiedFields
-    private int[][] addMove(int[][] copiedFields, int moveCount, int col, Map<Integer, Integer> possibleMoves) {
+    private void addMove(int[][] fields, int moveCount, int col, Map<Integer, Integer> possibleMoves) {
         if (moveCount % 2 == 0) {
             latestMoveRow = possibleMoves.get(col);
-            copiedFields[latestMoveRow][col] = myValue;
+            fields[latestMoveRow][col] = myValue;
         } else {
             latestMoveRow = possibleMoves.get(col);
-            copiedFields[latestMoveRow][col] = enemyValue;
+            fields[latestMoveRow][col] = enemyValue;
         }
-        return copiedFields;
     }
 
-    private int[][] removeMove(int[][] copiedFields, int row, int col, Map<Integer, Integer> possibleMoves) {
+    private void removeMove(int[][] fields, int row, int col, Map<Integer, Integer> possibleMoves) {
 
-        copiedFields[row][col] = 0;
-
-        return copiedFields;
+        fields[row][col] = 0;
     }
 
     private Map<Integer, Integer> findPossibleMoves(int[][] fields) {
