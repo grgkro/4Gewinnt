@@ -41,6 +41,7 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
     Map<Integer, Integer> secondNodeValues = new HashMap<>();   // first Integer (Key) = col of that move, second Integer (value) = the calculated value of that move. exp. (2, 50)
     Map<Integer, Integer> thirdNodeValues = new HashMap<>();   // first Integer (Key) = col of that move, second Integer (value) = the calculated value of that move. exp. (2, 50)
     private boolean fourInThisLineStillPossible;
+    private int enemyCanWinInCol;
 
 
 //    private int[][] savedGame = [{-1 -1 -1 -1 -1}]
@@ -112,6 +113,12 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
 
     public void startRecursion() {
         int moveCount = 0;
+        resetGlobalValues();
+//        sleep();
+        checkNextMoves(fields, moveCount);
+    }
+
+    private void resetGlobalValues() {
         firstNodeValues.clear();
         secondNodeValues.clear();
         thirdNodeValues.clear();
@@ -122,9 +129,7 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
         secondMoveCol = -1;
         secondMoveRow = -1;
         latestMoveRow = -1;
-
-//        sleep();
-        checkNextMoves(fields, moveCount);
+        enemyCanWinInCol = -1;
     }
 
     private Map.Entry<Integer, Integer> checkNextMoves(int[][] fields, int moveCount) {
@@ -178,7 +183,6 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
                 secondMoveCol = col;
                 if (gameIsLost(fields, possibleMoves.get(col), col, moveCount)) {
                     hinderEnemyFromCompletingFour(fields, col, possibleMoves);
-                    break;
                 } else {
                     secondNodeValues.put(col, checkNextMoves(fields, moveCount + 1).getValue());
                 }
@@ -207,9 +211,8 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
             possibleMoves.remove(col);
             losingMoves.add(col);
         } else {
-            System.out.println("------------Enemy can win -> The move in " + col + " is needed immediately, no need to check all the other possible moves --------------");
-            move(col);
-            stopRecursion = true;
+            System.out.println("------------Enemy can win -> The move in " + col + " is probably needed, except if we find a winning move --------------");
+            enemyCanWinInCol = col;
         }
     }
 
@@ -217,7 +220,11 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
         switch (moveCount) {
             case 0:
                 bestMove = findValueOfBestMove(firstNodeValues, moveCount, bestMove);
-                move(bestMove.getKey());
+                if (enemyCanWinInCol >= 0) {
+                    move(enemyCanWinInCol);
+                } else {
+                    move(bestMove.getKey());
+                }
                 break;
             case 1:
                 bestMove = findValueOfBestMove(secondNodeValues, moveCount, bestMove);
