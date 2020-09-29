@@ -204,11 +204,11 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
 
     private void hinderEnemyFromCompletingFour(int[][] fields, int col, Map<Integer, Integer> possibleMoves) {
         removeMove(fields, secondMoveRow, secondMoveCol, possibleMoves);
-        removeMove(fields, firstMoveRow, firstMoveCol, possibleMoves);
+//        removeMove(fields, firstMoveRow, firstMoveCol, possibleMoves);
         System.out.println("------------....Game would have been lost in " + col + " --------------");
         if (col == firstMoveCol) {  // wenn col == firstMoveCol, bedeutet dass, dass der Gewinnerzug vom Gegner überhaupt erst möglich wurde durch setzen meines davorigen Steines in der Reihe. Wir wollen dann gerade den Zug nicht machen.
-            System.out.println("------------Removed move in " + col + " from possibleMoves --------------");
-            possibleMoves.remove(col);
+            System.out.println("------------Added move in " + col + " to losingMoves -> if we don't find a winning move, this will be moved --------------");
+//            possibleMoves.remove(col);  // you can't take the move away inside the for loop, because java is going through all possibleMoves already.
             losingMoves.add(col);
         } else {
             System.out.println("------------Enemy can win -> The move in " + col + " is probably needed, except if we find a winning move --------------");
@@ -275,11 +275,37 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
 
 
     private Map.Entry<Integer, Integer> checkValues(Map<Integer, Integer> values, int moveCount) {
+        if (losingMoves.size() > 0) {
+            values = removeLosingMoves(values);
+        }
+
+        if (values.isEmpty()) {  // this means there are no moves left that are not losing moves
+            return getLastLosingMove();
+        }
         if (moveCount % 2 == 0) {
             return findMax(values);
         } else {
             return findMin(values);
         }
+    }
+
+    private Map<Integer, Integer> removeLosingMoves(Map<Integer, Integer> values) {
+        for (int losingMove: losingMoves) {
+            values.remove(losingMove);
+        }
+        return values;
+    }
+
+    private Map.Entry<Integer, Integer> getLastLosingMove() {
+        List<Integer> finalMoves = findNonNullRows(fields);
+        Map<Integer, Integer> finalMovesMap = new HashMap<>();
+        finalMovesMap.put(finalMoves.get(0), 0);
+        Map.Entry<Integer, Integer> finalMove = null;
+        for (Map.Entry<Integer, Integer> entry: finalMovesMap.entrySet()) {
+            finalMove = entry;
+            break;
+        }
+        return finalMove;
     }
 
     private Map.Entry<Integer, Integer> findMin(Map<Integer, Integer> values) {
