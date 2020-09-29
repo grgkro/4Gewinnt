@@ -117,6 +117,12 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
         thirdNodeValues.clear();
         losingMoves.clear();
         stopRecursion = false;
+        firstMoveCol = -1;
+        firstMoveRow = -1;
+        secondMoveCol = -1;
+        secondMoveRow = -1;
+        latestMoveRow = -1;
+
 //        sleep();
         checkNextMoves(fields, moveCount);
     }
@@ -143,12 +149,16 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
     }
 
     private void tryEachPossibleMove(int[][] fields, Map<Integer, Integer> possibleMoves, int moveCount) {
+        if (moveCount == 0) {
+            System.out.println("******************************* New Move 1 *******************************************");
+        }
         for (int col : possibleMoves.keySet()) {
             System.out.println("Going to check move (row = " + possibleMoves.get(col) + ", col = " + col + ") as " + (moveCount + 1) + ". move.");
             addMove(fields, moveCount, col, possibleMoves);
 
             if (moveCount == 0) {
 //                checkFirstMove(fields, possibleMoves, col, moveCount);
+
                 firstMoveRow = latestMoveRow;
                 firstMoveCol = col;
                 if(gameIsWon(fields, possibleMoves.get(col), col, moveCount)) {
@@ -174,7 +184,7 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
                 }
 
             } else if (moveCount == numCalculateMovesAhead) {
-                int value = checkMyCombos(fields, possibleMoves.get(col), col, moveCount);
+                int value = checkCombos(fields, possibleMoves.get(col), col, moveCount, myValue);
                 thirdNodeValues.put(col, value);
                 System.out.println("value: " + value);
                 removeMove(fields, latestMoveRow, col, possibleMoves);
@@ -222,7 +232,7 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
     }
 
     private boolean gameIsLost(int[][] fields, int row, int col, int moveCount) {
-        if (checkEnemiesCombos(fields, row, col, 0, moveCount) >= 500_000 ) {
+        if (checkCombos(fields, row, col, moveCount, enemyValue) >= 500_000 ) {
             return true;
         } else {
             return false;
@@ -230,7 +240,7 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
     }
 
     private boolean gameIsWon(int[][] fields, int row, int col, int moveCount) {
-        if (checkMyCombos(fields, row, col, moveCount) >= 500_000) {
+        if (checkCombos(fields, row, col, moveCount, myValue) >= 500_000) {
             return true;
         } else {
             return false;
@@ -289,27 +299,125 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
         return maxEntry;
     }
 
-    private int checkMyCombos(int[][] fields, int row, int col, int moveCount) {
+    // player can be 1 or 2 -> it will check the combos for player 1 or player 2
+    private int checkCombos(int[][] fields, int row, int col, int moveCount, int player) {
         int value = 0;
-        value = checkCombosHorizontally(fields, row, firstMoveRow, value, moveCount);
-        value = checkCombosVertically(fields, row, firstMoveRow, col, value, moveCount);
-        value = checkCombosDiagonallyLeftDownToRightUp(fields, row, firstMoveRow, value, moveCount);
-        value = checkCombosDiagonallyLeftUpToRightDown(fields, value, moveCount);
+        value = checkCombosHorizontally(fields, row, firstMoveRow, value, moveCount, player);
+        value = checkCombosVertically(fields, row, firstMoveRow, col, value, moveCount, player);
+        value = checkCombosDiagonallyLeftDownToRightUp(fields, row, firstMoveRow, value, moveCount, player);
+        value = checkCombosDiagonallyLeftUpToRightDown(fields, value, moveCount, player);
         return value;
     }
 
-    private int checkCombosHorizontally(int[][] fields, int row, int firstMoveRow, int value, int moveCount) {
-
+    private int checkCombosHorizontally(int[][] fields, int row, int firstMoveRow, int value, int moveCount, int player) {
         for (int y = 0; y <= (Math.max(row, firstMoveRow)) ; y++) {
             for (int x = 0; x <= (GameConstants.COL_COUNT - 4); x++) {  // we only need to go up to col 3, not col 7 (if col_count = 7)
+                int comboLength = checkComboLengthHorizontally(fields, y, x, player);
+                value = value + evaluateCombo(comboLength, moveCount);
+            }
+        }
+        return value;
+    }
+
+    private int checkComboLengthHorizontally(int[][] fields, int y, int x, int player) {
+        int comboLength = 0;
+        // go through the four columns, begin at the startCol and end at the target col + abs(offset - 3) -> z.B. offset = 2 bedeutet, wir fangen 2 links vom gesetzten Stein an. -> wir enden eins abs(2 - 3) rechts vom gesetzten Stein.
+        fourInThisLineStillPossible = true;
+        for (int i = x; i < (x + 4); i++) {
+            comboLength = getComboLengthHorizontally(fields, y, i, comboLength, player);
+            if (!fourInThisLineStillPossible) {
+                break;
+            }
+        }
+        return comboLength;
+    }
+
+    private int getComboLengthHorizontally(int[][] fields, int y, int i, int comboLength, int player) {
+        switch (player) {
+            case 1:
+                if (fields[y][i] == myValue) {
+                    return ++comboLength;
+                } else if (fields[y][i] == enemyValue) {
+                    fourInThisLineStillPossible = false;
+                }
+                break;
+            case 2:
+                if (fields[y][i] == enemyValue) {
+                    return ++comboLength;
+                } else if (fields[y][i] == myValue) {
+                    fourInThisLineStillPossible = false;
+                }
+                break;
+        }
+        return comboLength;
+    }
+
+
+    // we only need to check the two columns of our two moves and only under those moves, not above them.
+    private int checkCombosVertically(int[][] fields, int row, int firstMoveRow, int col, int value, int moveCount, int player) {
+
+        for (int x : new int[]{col, firstMoveCol}) {
+            for (int y = 0; y <= (Math.max(row, firstMoveRow)); y++) {
                 int comboLength = 0;
-                // go through the four columns, begin at the startCol and end at the target col + abs(offset - 3) -> z.B. offset = 2 bedeutet, wir fangen 2 links vom gesetzten Stein an. -> wir enden eins abs(2 - 3) rechts vom gesetzten Stein.
+                // go through the four columns, begin at the startCol and end at the target col + abs(offset - 3) -> zb offset = 2 (wir fangen 2 links vom gesetzten Stein an. -> wir enden eins abs(2 - 3) rechts vom gesetzten Stein.
                 fourInThisLineStillPossible = true;
-                for (int i = x; i < (x + 4); i++) {
-                    if (fields[y][i] == myValue) {
-                        comboLength++;
-                    } else if (fields[y][i] == enemyValue) {
-                        fourInThisLineStillPossible = false;
+                for (int i = y; i <= (y + 3); i++) {
+                    if (i < 6) {
+                        if (player == 1) {
+                                if (fields[i][x] == myValue) {
+                                    comboLength++;
+                                } else if (fields[i][x] == enemyValue) {
+                                    fourInThisLineStillPossible = false;
+                                    break;
+                                }
+                        } else if (player == 2) {
+                            if (fields[i][x] == enemyValue) {
+                                comboLength++;
+                            } else if (fields[i][x] == myValue) {
+                                fourInThisLineStillPossible = false;
+                                break;
+                            }
+                        }
+
+                    } else {
+                        break;
+                    }
+
+                }
+                value = value + evaluateCombo(comboLength, moveCount);
+            }
+        }
+        return value;
+    }
+
+    private int checkCombosDiagonallyLeftUpToRightDown(int[][] fields, int value, int moveCount, int player) {
+        for (int y = (GameConstants.ROW_COUNT - 1); y >= 3 ; y--) {   // if y < 3, this means that you cant have 4 in a row anymore, because you start at row 3 and move downwards...
+            for (int x = 0; x <= (GameConstants.COL_COUNT - 4); x++) {
+                fourInThisLineStillPossible = true;
+                int comboLength = 0;
+                int j = y;
+                // go through the four columns, begin at the startCol and end at the target col + abs(offset - 3) -> zb offset = 2 (wir fangen 2 links vom gesetzten Stein an. -> wir enden eins abs(2 - 3) rechts vom gesetzten Stein.
+                for (int i = x; i <= (x + 3); i++) {
+                    if (j >= 0) {
+                        if (player == 1) {
+                            if (fields[j][i] == myValue) {
+                                comboLength++;
+                            } else if (fields[j][i] == enemyValue) {
+                                fourInThisLineStillPossible = true;
+                                break;
+                            }
+                            j--;
+                        } else if (player == 2) {
+                            if (fields[j][i] == enemyValue) {
+                                comboLength++;
+                            } else if (fields[j][i] == myValue) {
+                                fourInThisLineStillPossible = true;
+                                break;
+                            }
+                            j--;
+                        }
+
+                    } else {
                         break;
                     }
                 }
@@ -319,22 +427,32 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
         return value;
     }
 
-
-    // we only need to check the two columns of our two moves and only under those moves, not above them.
-    private int checkCombosVertically(int[][] fields, int row, int firstMoveRow, int col, int value, int moveCount) {
-
-        for (int x : new int[]{col, firstMoveCol}) {
-            for (int y = 0; y <= (Math.max(row, firstMoveRow)); y++) {
-                int comboLength = 0;
-                // go through the four columns, begin at the startCol and end at the target col + abs(offset - 3) -> zb offset = 2 (wir fangen 2 links vom gesetzten Stein an. -> wir enden eins abs(2 - 3) rechts vom gesetzten Stein.
+    private int checkCombosDiagonallyLeftDownToRightUp(int[][] fields, int row, int firstMoveRow, int value, int moveCount, int player) {
+        int lastRow = getLastRowWeNeedToCheck(row, firstMoveRow);
+        for (int y = 0; y <= lastRow; y++) {
+            for (int x = 0; x <= (GameConstants.COL_COUNT - 4); x++) {
                 fourInThisLineStillPossible = true;
-                for (int i = y; i <= (y + 3); i++) {
-                    if (i < 6) {
-                        if (fields[i][x] == myValue) {
-                            comboLength++;
-                        } else if (fields[i][x] == enemyValue) {
-                            fourInThisLineStillPossible = false;
-                            break;
+                int comboLength = 0;
+                int j = y;
+                // go through the four columns, begin at the startCol and end at the target col + abs(offset - 3) -> zb offset = 2 (wir fangen 2 links vom gesetzten Stein an. -> wir enden eins abs(2 - 3) rechts vom gesetzten Stein.
+                for (int i = x; i <= (x + 3); i++) {
+                    if (j < 6) {
+                        if (player == 1) {
+                            if (fields[j][i] == myValue) {
+                                comboLength++;
+                            } else if (fields[j][i] == enemyValue) {
+                                fourInThisLineStillPossible = true;
+                                break;
+                            }
+                            j++;
+                        } else if (player == 2) {
+                            if (fields[j][i] == enemyValue) {
+                                comboLength++;
+                            } else if (fields[j][i] == myValue) {
+                                fourInThisLineStillPossible = true;
+                                break;
+                            }
+                            j++;
                         }
                     } else {
                         break;
@@ -347,136 +465,13 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
         return value;
     }
 
-    private int checkCombosDiagonallyLeftUpToRightDown(int[][] fields, int value, int moveCount) {
-        for (int y = (GameConstants.ROW_COUNT - 1); y >= 0 ; y--) {
-            for (int x = 0; x <= (GameConstants.COL_COUNT / 2); x++) {
-                int comboLength = 0;
-                int j = y;
-                // go through the four columns, begin at the startCol and end at the target col + abs(offset - 3) -> zb offset = 2 (wir fangen 2 links vom gesetzten Stein an. -> wir enden eins abs(2 - 3) rechts vom gesetzten Stein.
-                for (int i = x; i <= (x + 3); i++) {
-                    if (j >= 0) {
-                        if (fields[j][i] == myValue) comboLength++;
-                        if (fields[j][i] == enemyValue) break;
-                        j--;
-                    } else {
-                        break;
-                    }
-                }
-                value = value + evaluateCombo(comboLength, moveCount);
-            }
+    private int getLastRowWeNeedToCheck(int row, int firstMoveRow) {
+        // we have to be at least four rows away from the upper fields border to get four in a row diagonally upwards
+        if (row < (GameConstants.ROW_COUNT - 4) && firstMoveRow < (GameConstants.ROW_COUNT - 4)) {
+            return Math.max(row, firstMoveRow);
+        } else {
+            return (GameConstants.ROW_COUNT - 4);
         }
-        return value;
-    }
-
-    private int checkCombosDiagonallyLeftDownToRightUp(int[][] fields, int row, int firstMoveRow, int value, int moveCount) {
-        for (int y = 0; y <= (Math.max(row, firstMoveRow)) ; y++) {
-            for (int x = 0; x <= (GameConstants.COL_COUNT / 2); x++) {
-                int comboLength = 0;
-                int j = y;
-                // go through the four columns, begin at the startCol and end at the target col + abs(offset - 3) -> zb offset = 2 (wir fangen 2 links vom gesetzten Stein an. -> wir enden eins abs(2 - 3) rechts vom gesetzten Stein.
-                for (int i = x; i <= (x + 3); i++) {
-                    if (j < 6) {
-                        if (fields[j][i] == myValue) comboLength++;
-                        if (fields[j][i] == enemyValue) break;
-                        j++;
-                    } else {
-                        break;
-                    }
-
-                }
-                value = value + evaluateCombo(comboLength, moveCount);
-            }
-        }
-        return value;
-    }
-
-    private int checkEnemiesCombos(int[][] fields, int row, int col, int firstMoveRow, int moveCount) {
-        int value = 0;
-        value = checkEnemyHorizontally(fields, row, firstMoveRow, col, value, moveCount);
-        value = checkEnemyVertically(fields, row, firstMoveRow, col, value, moveCount);
-        value = checkEnemyDiagonallyLeftDownToRightUp(fields, row, firstMoveRow, col, value, moveCount);
-        value = checkEnemyDiagonallyLeftUpToRightDown(fields, value, moveCount);
-        return value;
-    }
-
-    private int checkEnemyHorizontally(int[][] fields, int row, int firstMoveRow, int col, int value, int moveCount) {
-        for (int y = 0; y <= (Math.max(row, firstMoveRow)) ; y++) {
-            for (int x = 0; x <= (GameConstants.COL_COUNT / 2); x++) {
-                int comboLength = 0;
-                // go through the four columns, begin at the startCol and end at the target col + abs(offset - 3) -> zb offset = 2 (wir fangen 2 links vom gesetzten Stein an. -> wir enden eins abs(2 - 3) rechts vom gesetzten Stein.
-
-                for (int i = x; i <= (x + 3); i++) {
-                    if (fields[y][i] == myValue) break;
-                    if (fields[y][i] == enemyValue) comboLength++;
-                }
-                value = value + evaluateCombo(comboLength, moveCount);
-            }
-        }
-        return value;
-    }
-
-    private int checkEnemyVertically(int[][] fields, int row, int firstMoveRow, int col, int value, int moveCount) {
-        for (int x = 0; x < GameConstants.COL_COUNT ; x++) {
-            for (int y = 0; y <= (Math.max(row, firstMoveRow)); y++) {
-                int comboLength = 0;
-                // go through the four columns, begin at the startCol and end at the target col + abs(offset - 3) -> zb offset = 2 (wir fangen 2 links vom gesetzten Stein an. -> wir enden eins abs(2 - 3) rechts vom gesetzten Stein.
-
-                for (int i = y; i <= (y + 3); i++) {
-                    if (i < 6) {
-                        if (fields[i][x] == myValue) break;
-                        if (fields[i][x] == enemyValue) comboLength++;
-                    } else {
-                        break;
-                    }
-
-                }
-                value = value + evaluateCombo(comboLength, moveCount);
-            }
-        }
-        return value;
-    }
-
-    private int checkEnemyDiagonallyLeftUpToRightDown(int[][] fields, int value, int moveCount) {
-        for (int y = (GameConstants.ROW_COUNT - 1); y >= 0 ; y--) {
-            for (int x = 0; x <= (GameConstants.COL_COUNT / 2); x++) {
-                int comboLength = 0;
-                int j = y;
-                // go through the four columns, begin at the startCol and end at the target col + abs(offset - 3) -> zb offset = 2 (wir fangen 2 links vom gesetzten Stein an. -> wir enden eins abs(2 - 3) rechts vom gesetzten Stein.
-                for (int i = x; i <= (x + 3); i++) {
-                    if (j >= 0) {
-                        if (fields[j][i] == myValue) break;
-                        if (fields[j][i] == enemyValue) comboLength++;
-                        j--;
-                    } else {
-                        break;
-                    }
-                }
-                value = value + evaluateCombo(comboLength, moveCount);
-            }
-        }
-        return value;
-    }
-
-    private int checkEnemyDiagonallyLeftDownToRightUp(int[][] fields, int row, int firstMoveRow, int col, int value, int moveCount) {
-        for (int y = 0; y <= (Math.max(row, firstMoveRow)) ; y++) {
-            for (int x = 0; x <= (GameConstants.COL_COUNT / 2); x++) {
-                int comboLength = 0;
-                int j = y;
-                // go through the four columns, begin at the startCol and end at the target col + abs(offset - 3) -> zb offset = 2 (wir fangen 2 links vom gesetzten Stein an. -> wir enden eins abs(2 - 3) rechts vom gesetzten Stein.
-                for (int i = x; i <= (x + 3); i++) {
-                    if (j < 6) {
-                        if (fields[j][i] == myValue) break;
-                        if (fields[j][i] == enemyValue) comboLength++;
-                        j++;
-                    } else {
-                        break;
-                    }
-
-                }
-                value = value + evaluateCombo(comboLength, moveCount);
-            }
-        }
-        return value;
     }
 
     private int evaluateCombo(int comboLength, int moveCount) {
