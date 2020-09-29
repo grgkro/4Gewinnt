@@ -37,6 +37,10 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
     private boolean stopRecursion;
     List<Integer> losingMoves = new ArrayList();
 
+    Map<Integer, Integer> firstNodeValues = new HashMap<>();   // first Integer (Key) = col of that move, second Integer (value) = the calculated value of that move. exp. (2, 50)
+    Map<Integer, Integer> secondNodeValues = new HashMap<>();   // first Integer (Key) = col of that move, second Integer (value) = the calculated value of that move. exp. (2, 50)
+    Map<Integer, Integer> thirdNodeValues = new HashMap<>();   // first Integer (Key) = col of that move, second Integer (value) = the calculated value of that move. exp. (2, 50)
+
 
 
 //    private int[][] savedGame = [{-1 -1 -1 -1 -1}]
@@ -109,65 +113,22 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
 
     public void startRecursion() {
         int moveCount = 0;
-        Map<Integer, Integer> firstNodeValues = new HashMap<>();   // first Integer (Key) = col of that move, second Integer (value) = the calculated value of that move. exp. (2, 50)
-        Map<Integer, Integer> secondNodeValues = new HashMap<>();   // first Integer (Key) = col of that move, second Integer (value) = the calculated value of that move. exp. (2, 50)
-        Map<Integer, Integer> finalNodeValues = new HashMap<>();   // first Integer (Key) = col of that move, second Integer (value) = the calculated value of that move. exp. (2, 50)
-        checkNextMoves(fields, moveCount, firstNodeValues, secondNodeValues, finalNodeValues);
+        firstNodeValues.clear();
+        secondNodeValues.clear();
+        thirdNodeValues.clear();
+//        sleep();
+        checkNextMoves(fields, moveCount);
     }
 
-    private Map.Entry<Integer, Integer> checkNextMoves(int[][] fields, int moveCount, Map<Integer, Integer> firstNodeValues, Map<Integer, Integer> secondNodeValues, Map<Integer, Integer> finalNodeValues) {
-        if (stopRecursion) return null;
+    private Map.Entry<Integer, Integer> checkNextMoves(int[][] fields, int moveCount) {
+        if (stopRecursion) {
+            return null;
+        }
         Map<Integer, Integer> possibleMoves = findPossibleMoves(fields);
 
-
         Map.Entry<Integer, Integer> bestMove = null;
-        for (int col : possibleMoves.keySet()) {
-            System.out.println("Going to check move (row = " + possibleMoves.get(col) + ", col = " + col + ") as " + (moveCount + 1) + ". move.");
-            fields = addMove(fields, moveCount, col, possibleMoves);
+        fields = tryEachPossibleMove(fields, possibleMoves, moveCount);
 
-                if (moveCount == 0) {
-                    firstMoveRow = latestMoveRow;
-                    firstMoveCol = col;
-                    if(gameIsWon(fields, possibleMoves.get(col), col)) {
-                        System.out.println("------------Game can be won immediately in " + col + " --------------");
-                        move(col);
-                        fields = removeMove(fields, firstMoveRow, col, possibleMoves);
-                        stopRecursion = true;
-                        break;
-                    }
-                    try {
-                        firstNodeValues.put(col, checkNextMoves(fields, moveCount + 1, firstNodeValues, secondNodeValues, finalNodeValues).getValue());
-                    } catch (NullPointerException e) {
-                        return null;
-                    }
-
-                } else if (moveCount == 1) {
-                    secondMoveRow = latestMoveRow;
-                    secondMoveCol = col;
-                    if(gameIsLost(fields, possibleMoves.get(col), col)) {
-                        fields = removeMove(fields, secondMoveRow, col, possibleMoves);
-                        fields = removeMove(fields, firstMoveRow, col, possibleMoves);
-                        System.out.println("------------....Game would have been lost in " + col + " --------------");
-                        if (col == firstMoveCol) {  // wenn col == firstMoveCol, bedeutet dass, dass der Gewinnerzug vom Gegner überhaupt erst möglich wurde durch setzen des Steines in der Reihe. Wir wollen dann gerade den Zug nicht machen.
-                            System.out.println("------------Removed move in " + col + " from possibleMoves --------------");
-                            possibleMoves.remove(col);
-                            losingMoves.add(col);
-                            break;
-                        }
-                        System.out.println("------------The move in " + col + " is needed --------------");
-                        move(col);
-                        stopRecursion = true;
-                        break;
-                    }
-                    secondNodeValues.put(col, checkNextMoves(fields, moveCount + 1, firstNodeValues, secondNodeValues, finalNodeValues).getValue());
-                } else if (moveCount == numCalculateMovesAhead) {
-                    int value = evaluate(fields, possibleMoves.get(col), col, firstMoveRow);
-                    finalNodeValues.put(col, value);
-                    System.out.println("value: " + value);
-                    fields = removeMove(fields, latestMoveRow, col, possibleMoves);
-                }
-
-        }
         // Auswertung:
         if (stopRecursion) return null;
         switch (moveCount) {
@@ -180,12 +141,62 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
                 removeMove(fields, firstMoveRow, firstMoveCol, possibleMoves);
                 break;
             case 2:
-                bestMove = findValueOfBestMove(finalNodeValues, moveCount, bestMove);
+                bestMove = findValueOfBestMove(thirdNodeValues, moveCount, bestMove);
                 removeMove(fields, secondMoveRow, secondMoveCol, possibleMoves);
                 break;
         }
 
         return bestMove;
+    }
+
+    private int[][] tryEachPossibleMove(int[][] fields, Map<Integer, Integer> possibleMoves, int moveCount) {
+        for (int col : possibleMoves.keySet()) {
+            System.out.println("Going to check move (row = " + possibleMoves.get(col) + ", col = " + col + ") as " + (moveCount + 1) + ". move.");
+            fields = addMove(fields, moveCount, col, possibleMoves);
+
+            if (moveCount == 0) {
+                firstMoveRow = latestMoveRow;
+                firstMoveCol = col;
+                if(gameIsWon(fields, possibleMoves.get(col), col)) {
+                    System.out.println("------------Game can be won immediately in " + col + " --------------");
+                    move(col);
+                    fields = removeMove(fields, firstMoveRow, col, possibleMoves);
+                    stopRecursion = true;
+                    break;
+                }
+                try {
+                    firstNodeValues.put(col, checkNextMoves(fields, moveCount + 1).getValue());
+                } catch (NullPointerException e) {
+                    return null;
+                }
+
+            } else if (moveCount == 1) {
+                secondMoveRow = latestMoveRow;
+                secondMoveCol = col;
+                if(gameIsLost(fields, possibleMoves.get(col), col)) {
+                    fields = removeMove(fields, secondMoveRow, col, possibleMoves);
+                    fields = removeMove(fields, firstMoveRow, col, possibleMoves);
+                    System.out.println("------------....Game would have been lost in " + col + " --------------");
+                    if (col == firstMoveCol) {  // wenn col == firstMoveCol, bedeutet dass, dass der Gewinnerzug vom Gegner überhaupt erst möglich wurde durch setzen des Steines in der Reihe. Wir wollen dann gerade den Zug nicht machen.
+                        System.out.println("------------Removed move in " + col + " from possibleMoves --------------");
+                        possibleMoves.remove(col);
+                        losingMoves.add(col);
+                        break;
+                    }
+                    System.out.println("------------The move in " + col + " is needed --------------");
+                    move(col);
+                    stopRecursion = true;
+                    break;
+                }
+                secondNodeValues.put(col, checkNextMoves(fields, moveCount + 1).getValue());
+            } else if (moveCount == numCalculateMovesAhead) {
+                int value = evaluate(fields, possibleMoves.get(col), col, firstMoveRow);
+                thirdNodeValues.put(col, value);
+                System.out.println("value: " + value);
+                fields = removeMove(fields, latestMoveRow, col, possibleMoves);
+            }
+        }
+        return fields;
     }
 
     private boolean gameIsLost(int[][] fields, int row, int col) {
@@ -519,6 +530,8 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
     }
 
 
+
+
     public boolean isInBound(int columnNo) {
         return fields[GameConstants.ROW_COUNT - 1][columnNo] != 0;
     }
@@ -545,5 +558,13 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
 
     @Override
     protected void logCustom(String str) {
+    }
+
+    private void sleep() {
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
     }
 }
