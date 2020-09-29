@@ -310,7 +310,7 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
 
     private int checkCombosHorizontally(int[][] fields, int row, int firstMoveRow, int value, int moveCount, int player) {
         for (int y = 0; y <= (Math.max(row, firstMoveRow)); y++) {
-            for (int x = 0; x <= (GameConstants.COL_COUNT - 4); x++) {  // we only need to go up to col 3, not col 7 (if col_count = 7)
+            for (int x = 0; x <= (GameConstants.COL_COUNT - 4); x++) {  // we only need to go to col 3, not col 7 (if col_count = 7)
                 int comboLength = checkOneComboHorizontally(fields, y, x, player);
                 value = value + evaluateCombo(comboLength, moveCount);
             }
@@ -421,6 +421,7 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
                 if (!fourInThisLineStillPossible) {
                     break;
                 }
+                j--;
             } else {
                 break;
             }
@@ -436,7 +437,6 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
                 } else if (fields[j][i] == enemyValue) {
                     fourInThisLineStillPossible = true;
                 }
-                j--;
                 break;
             case 2:
                 if (fields[j][i] == enemyValue) {
@@ -444,7 +444,6 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
                 } else if (fields[j][i] == myValue) {
                     fourInThisLineStillPossible = true;
                 }
-                j--;
                 break;
         }
     return comboLength;
@@ -472,6 +471,7 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
                 if (!fourInThisLineStillPossible) {
                     break;
                 }
+                j++;
             } else {
                 break;
             }
@@ -488,7 +488,6 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
                 } else if (fields[j][i] == enemyValue) {
                     fourInThisLineStillPossible = true;
                 }
-                j++;
                 break;
             case 2:
                 if (fields[j][i] == enemyValue) {
@@ -496,7 +495,6 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
                 } else if (fields[j][i] == myValue) {
                     fourInThisLineStillPossible = true;
                 }
-                j++;
                 break;
         }
         return comboLength;
