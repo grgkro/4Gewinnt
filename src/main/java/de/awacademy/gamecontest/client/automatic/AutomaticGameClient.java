@@ -116,6 +116,8 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
         firstNodeValues.clear();
         secondNodeValues.clear();
         thirdNodeValues.clear();
+        losingMoves.clear();
+        stopRecursion = false;
 //        sleep();
         checkNextMoves(fields, moveCount);
     }
@@ -124,27 +126,19 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
         if (stopRecursion) {
             return null;
         }
+
         Map<Integer, Integer> possibleMoves = findPossibleMoves(fields);
 
         Map.Entry<Integer, Integer> bestMove = null;
+
         fields = tryEachPossibleMove(fields, possibleMoves, moveCount);
 
-        // Auswertung:
-        if (stopRecursion) return null;
-        switch (moveCount) {
-            case 0:
-                bestMove = findValueOfBestMove(firstNodeValues, moveCount, bestMove);
-                move(bestMove.getKey());
-                break;
-            case 1:
-                bestMove = findValueOfBestMove(secondNodeValues, moveCount, bestMove);
-                removeMove(fields, firstMoveRow, firstMoveCol, possibleMoves);
-                break;
-            case 2:
-                bestMove = findValueOfBestMove(thirdNodeValues, moveCount, bestMove);
-                removeMove(fields, secondMoveRow, secondMoveCol, possibleMoves);
-                break;
+        if (stopRecursion) {   // we could have moved in tryEachPossibleMove(), so we need to check again, if recursion should be stopped
+            return null;
         }
+
+        // Auswertung:
+        bestMove = findAndMakeBestMove(fields, possibleMoves, bestMove, moveCount);
 
         return bestMove;
     }
@@ -167,6 +161,7 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
                 try {
                     firstNodeValues.put(col, checkNextMoves(fields, moveCount + 1).getValue());
                 } catch (NullPointerException e) {
+                    System.out.println(e);
                     return null;
                 }
 
@@ -177,16 +172,17 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
                     fields = removeMove(fields, secondMoveRow, col, possibleMoves);
                     fields = removeMove(fields, firstMoveRow, col, possibleMoves);
                     System.out.println("------------....Game would have been lost in " + col + " --------------");
-                    if (col == firstMoveCol) {  // wenn col == firstMoveCol, bedeutet dass, dass der Gewinnerzug vom Gegner überhaupt erst möglich wurde durch setzen des Steines in der Reihe. Wir wollen dann gerade den Zug nicht machen.
+                    if (col == firstMoveCol) {  // wenn col == firstMoveCol, bedeutet dass, dass der Gewinnerzug vom Gegner überhaupt erst möglich wurde durch setzen meines davorigen Steines in der Reihe. Wir wollen dann gerade den Zug nicht machen.
                         System.out.println("------------Removed move in " + col + " from possibleMoves --------------");
                         possibleMoves.remove(col);
                         losingMoves.add(col);
                         break;
+                    } else {
+                        System.out.println("------------Enemy can win -> The move in " + col + " is needed immediately, no need to check all the other possible moves --------------");
+                        move(col);
+                        stopRecursion = true;
+                        break;
                     }
-                    System.out.println("------------The move in " + col + " is needed --------------");
-                    move(col);
-                    stopRecursion = true;
-                    break;
                 }
                 secondNodeValues.put(col, checkNextMoves(fields, moveCount + 1).getValue());
             } else if (moveCount == numCalculateMovesAhead) {
@@ -199,8 +195,26 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
         return fields;
     }
 
+    private Map.Entry<Integer, Integer> findAndMakeBestMove(int[][] fields, Map<Integer, Integer> possibleMoves, Map.Entry<Integer, Integer> bestMove, int moveCount) {
+        switch (moveCount) {
+            case 0:
+                bestMove = findValueOfBestMove(firstNodeValues, moveCount, bestMove);
+                move(bestMove.getKey());
+                break;
+            case 1:
+                bestMove = findValueOfBestMove(secondNodeValues, moveCount, bestMove);
+                removeMove(fields, firstMoveRow, firstMoveCol, possibleMoves);
+                break;
+            case 2:
+                bestMove = findValueOfBestMove(thirdNodeValues, moveCount, bestMove);
+                removeMove(fields, secondMoveRow, secondMoveCol, possibleMoves);
+                break;
+        }
+        return bestMove;
+    }
+
     private boolean gameIsLost(int[][] fields, int row, int col) {
-        if (checkEnemiesCombos(fields, row, col, 0) > 500_000 ) {
+        if (checkEnemiesCombos(fields, row, col, 0) >= 500_000 ) {
             return true;
         } else {
             return false;
