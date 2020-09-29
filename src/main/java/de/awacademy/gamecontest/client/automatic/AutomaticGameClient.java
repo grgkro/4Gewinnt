@@ -199,8 +199,8 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
     }
 
     private void hinderEnemyFromCompletingFour(int[][] fields, int col, Map<Integer, Integer> possibleMoves) {
-        removeMove(fields, secondMoveRow, col, possibleMoves);
-        removeMove(fields, firstMoveRow, col, possibleMoves);
+        removeMove(fields, secondMoveRow, secondMoveCol, possibleMoves);
+        removeMove(fields, firstMoveRow, firstMoveCol, possibleMoves);
         System.out.println("------------....Game would have been lost in " + col + " --------------");
         if (col == firstMoveCol) {  // wenn col == firstMoveCol, bedeutet dass, dass der Gewinnerzug vom Gegner überhaupt erst möglich wurde durch setzen meines davorigen Steines in der Reihe. Wir wollen dann gerade den Zug nicht machen.
             System.out.println("------------Removed move in " + col + " from possibleMoves --------------");
