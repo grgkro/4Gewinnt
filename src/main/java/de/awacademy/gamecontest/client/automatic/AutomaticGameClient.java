@@ -98,6 +98,7 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
     public void playerRegistered(Player player) {
         if (player1 == null) {
             player1 = player;
+            move(4);
         } else {
             player2 = player;
             if (iAmYellow) {
@@ -183,7 +184,7 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
                     }
                 }
             } else if (moveCount == 1) {
-                System.out.println("############################## New Move 2 ##################################");
+                System.out.println("############################## New Move 2 (enemy) ##################################");
                 secondMoveRow = latestMoveRow;
                 secondMoveCol = col;
                 if (gameIsLost(fields, possibleMoves.get(col), col, moveCount)) {
