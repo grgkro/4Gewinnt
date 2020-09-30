@@ -42,6 +42,10 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
     Map<Integer, Integer> thirdNodeValues = new HashMap<>();   // first Integer (Key) = col of that move, second Integer (value) = the calculated value of that move. exp. (2, 50)
     private boolean fourInThisLineStillPossible;
     private int enemyCanWinInCol;
+    private int bestMoveEnemy;
+    private int bestMoveEnemyValue;
+    private int myBestSecondMoveValue;
+    private int myBestSecondMove;
 
 
 //    private int[][] savedGame = [{-1 -1 -1 -1 -1}]
@@ -179,6 +183,7 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
                     }
                 }
             } else if (moveCount == 1) {
+                System.out.println("############################## New Move 2 ##################################");
                 secondMoveRow = latestMoveRow;
                 secondMoveCol = col;
                 if (gameIsLost(fields, possibleMoves.get(col), col, moveCount)) {
@@ -207,7 +212,7 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
 //        removeMove(fields, firstMoveRow, firstMoveCol, possibleMoves);
         System.out.println("------------....Game would have been lost in " + col + " --------------");
         if (col == firstMoveCol) {  // wenn col == firstMoveCol, bedeutet dass, dass der Gewinnerzug vom Gegner überhaupt erst möglich wurde durch setzen meines davorigen Steines in der Reihe. Wir wollen dann gerade den Zug nicht machen.
-            System.out.println("------------Added move in " + col + " to losingMoves -> if we don't find a winning move, this will be moved --------------");
+            System.out.println("------------Added move in " + col + " to losingMoves --------------");
 //            possibleMoves.remove(col);  // you can't take the move away inside the for loop, because java is going through all possibleMoves already.
             losingMoves.add(col);
         } else {
@@ -220,18 +225,28 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
         switch (moveCount) {
             case 0:
                 bestMove = findValueOfBestMove(firstNodeValues, moveCount, bestMove);
+                System.out.println("bestMove: " + bestMove);
+                System.out.println("enemyCanWinInCol: " + enemyCanWinInCol);
+                System.out.println("losingMoves: " + losingMoves);
+                System.out.println("possibleMoves: " + possibleMoves);
                 if (enemyCanWinInCol >= 0) {
+                    System.out.println("move(enemyCanWinInCol)");
                     move(enemyCanWinInCol);
                 } else {
+                    System.out.println("move(bestMove");
                     move(bestMove.getKey());
                 }
                 break;
             case 1:
                 bestMove = findValueOfBestMove(secondNodeValues, moveCount, bestMove);
+                bestMoveEnemy = bestMove.getKey();
+                bestMoveEnemyValue = bestMove.getValue();
                 removeMove(fields, firstMoveRow, firstMoveCol, possibleMoves);
                 break;
             case 2:
                 bestMove = findValueOfBestMove(thirdNodeValues, moveCount, bestMove);
+                myBestSecondMove = bestMove.getKey();
+                myBestSecondMoveValue = bestMove.getValue(); 
                 removeMove(fields, secondMoveRow, secondMoveCol, possibleMoves);
                 break;
         }
@@ -468,14 +483,14 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
                 if (fields[j][i] == myValue) {
                     return ++comboLength;
                 } else if (fields[j][i] == enemyValue) {
-                    fourInThisLineStillPossible = true;
+                    fourInThisLineStillPossible = false;
                 }
                 break;
             case 2:
                 if (fields[j][i] == enemyValue) {
                     return ++comboLength;
                 } else if (fields[j][i] == myValue) {
-                    fourInThisLineStillPossible = true;
+                    fourInThisLineStillPossible = false;
                 }
                 break;
         }
@@ -519,14 +534,14 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
                 if (fields[j][i] == myValue) {
                     return ++comboLength;
                 } else if (fields[j][i] == enemyValue) {
-                    fourInThisLineStillPossible = true;
+                    fourInThisLineStillPossible = false;
                 }
                 break;
             case 2:
                 if (fields[j][i] == enemyValue) {
                     return ++comboLength;
                 } else if (fields[j][i] == myValue) {
-                    fourInThisLineStillPossible = true;
+                    fourInThisLineStillPossible = false;
                 }
                 break;
         }
@@ -549,17 +564,17 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
         } else if (comboLength == 3 && fourInThisLineStillPossible) {
             switch (moveCount) {  // getting 3 in a row with at least one empty field left next to it is more valuable, when it happens in the first move (of me or the enemy)
                 case 0:
-                    comboValue = 100_000;
+                    comboValue = 10_000;
                     break;
                 case 1:
-                    comboValue = 100_000;
+                    comboValue = 10_000;
                     break;
                 case 2:
-                    comboValue = 20_000;
+                    comboValue = 2_000;
                     break;
             }
         } else if (comboLength == 2 && fourInThisLineStillPossible && moveCount < 2) {   // 2 in a row is only useful if it happens in the first move -> moveCount == 0 (or the first move of the enemy -> moveCount == 1)
-            comboValue = 5_000;
+            comboValue = 500;
         }
         return comboValue;
     }
@@ -593,7 +608,7 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
 
     private List<Integer> findNonNullRows(int[][] fields) {
         List<Integer> nonFullColumns = new ArrayList<>();
-        for (int i = 0; i < GameConstants.COL_COUNT - 1; i++) {
+        for (int i = 0; i < GameConstants.COL_COUNT; i++) {
             if (fields[GameConstants.ROW_COUNT - 1][i] != 1 && fields[GameConstants.ROW_COUNT - 1][i] != 2) {
                 nonFullColumns.add(i);
             }
