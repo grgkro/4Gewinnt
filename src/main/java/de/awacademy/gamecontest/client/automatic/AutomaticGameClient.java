@@ -28,11 +28,13 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
     private boolean iAmYellow;
     private int myValue;
     private int enemyValue;
-    private int numCalculateMovesAhead = 2;
+    private int numCalculateMovesAhead = 3;
     private int firstMoveRow;
     private int firstMoveCol;
     private int secondMoveRow;
     private int secondMoveCol;
+    private int thirdMoveRow;
+    private int thirdMoveCol;
     private int latestMoveRow;
     private boolean stopRecursion;
     List<Integer> losingMoves = new ArrayList();
@@ -40,12 +42,16 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
     Map<Integer, Integer> firstNodeValues = new HashMap<>();   // first Integer (Key) = col of that move, second Integer (value) = the calculated value of that move. exp. (2, 50)
     Map<Integer, Integer> secondNodeValues = new HashMap<>();   // first Integer (Key) = col of that move, second Integer (value) = the calculated value of that move. exp. (2, 50)
     Map<Integer, Integer> thirdNodeValues = new HashMap<>();   // first Integer (Key) = col of that move, second Integer (value) = the calculated value of that move. exp. (2, 50)
+    Map<Integer, Integer> lastNodeValues = new HashMap<>();   // first Integer (Key) = col of that move, second Integer (value) = the calculated value of that move. exp. (2, 50)
     private boolean fourInThisLineStillPossible;
     private int enemyCanWinInCol;
     private int bestMoveEnemy;
     private int bestMoveEnemyValue;
     private int myBestSecondMoveValue;
     private int myBestSecondMove;
+    private int myBestThirdMoveValue;
+    private int myBestThirdMove;
+    private int lastPossibleRow;
 
 
 //    private int[][] savedGame = [{-1 -1 -1 -1 -1}]
@@ -96,13 +102,15 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
 
     @Override
     public void playerRegistered(Player player) {
+//        sleep(2000);
         if (player1 == null) {
             player1 = player;
             move(4);
         } else {
             player2 = player;
             if (iAmYellow) {
-                move(3);
+//                move(3);
+                move(0);
             }
         }
     }
@@ -119,7 +127,7 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
     public void startRecursion() {
         int moveCount = 0;
         resetGlobalValues();
-//        sleep();
+        sleep(200);
         checkNextMoves(fields, moveCount);
     }
 
@@ -127,12 +135,15 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
         firstNodeValues.clear();
         secondNodeValues.clear();
         thirdNodeValues.clear();
+        lastNodeValues.clear();
         losingMoves.clear();
         stopRecursion = false;
         firstMoveCol = -1;
         firstMoveRow = -1;
         secondMoveCol = -1;
         secondMoveRow = -1;
+        thirdMoveCol = -1;
+        thirdMoveRow = -1;
         latestMoveRow = -1;
         enemyCanWinInCol = -1;
     }
@@ -141,9 +152,10 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
         if (stopRecursion) {
             return null;
         }
-
         Map<Integer, Integer> possibleMoves = findPossibleMoves(fields);
-
+        if (possibleMoves.size() == 1 && moveCount == 0) {
+            lastPossibleRow = (int) possibleMoves.keySet().toArray()[0]; // To get the value of the "first" key, we need that at the end.
+        }
         Map.Entry<Integer, Integer> bestMove = null;
 
         tryEachPossibleMove(fields, possibleMoves, moveCount);
@@ -193,9 +205,23 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
                     secondNodeValues.put(col, checkNextMoves(fields, moveCount + 1).getValue());
                 }
 
+            } else if (moveCount == 2) {
+//                checkFirstMove(fields, possibleMoves, col, moveCount);
+                System.out.println("############################## New Move 3 (me) ##################################");
+                thirdMoveRow = latestMoveRow;
+                thirdMoveCol = col;
+
+                    try {
+                        thirdNodeValues.put(col, checkNextMoves(fields, moveCount + 1).getValue());
+                    } catch (NullPointerException e) {
+                        System.out.println("Problem in third Node" + e);
+                        return;
+                    }
+
             } else if (moveCount == numCalculateMovesAhead) {
-                int value = checkCombos(fields, possibleMoves.get(col), col, moveCount, myValue);
-                thirdNodeValues.put(col, value);
+                int value = checkCombos(fields, possibleMoves.get(col), col, moveCount, enemyValue);
+                lastNodeValues.put(col, value);
+
                 System.out.println("value: " + value);
                 removeMove(fields, latestMoveRow, col, possibleMoves);
             }
@@ -226,6 +252,10 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
         switch (moveCount) {
             case 0:
                 bestMove = findValueOfBestMove(firstNodeValues, moveCount, bestMove);
+                if (bestMove == null) {  // this means there are no moves left that are not losing moves
+                    bestMove = getLastLosingMove();
+
+                }
                 System.out.println("bestMove: " + bestMove);
                 System.out.println("enemyCanWinInCol: " + enemyCanWinInCol);
                 System.out.println("losingMoves: " + losingMoves);
@@ -233,6 +263,9 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
                 if (enemyCanWinInCol >= 0) {
                     System.out.println("move(enemyCanWinInCol)");
                     move(enemyCanWinInCol);
+                } else if (bestMove == null) {
+                    System.out.println("move(lastPossibleRow");
+                    move(lastPossibleRow);
                 } else {
                     System.out.println("move(bestMove");
                     move(bestMove.getKey());
@@ -249,6 +282,12 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
                 myBestSecondMove = bestMove.getKey();
                 myBestSecondMoveValue = bestMove.getValue();
                 removeMove(fields, secondMoveRow, secondMoveCol, possibleMoves);
+                break;
+            case 3:
+                bestMove = findValueOfBestMove(lastNodeValues, moveCount, bestMove);
+                myBestThirdMove = bestMove.getKey();
+                myBestThirdMoveValue = bestMove.getValue();
+                removeMove(fields, thirdMoveRow, thirdMoveCol, possibleMoves);
                 break;
         }
         return bestMove;
@@ -294,11 +333,7 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
         if (losingMoves.size() > 0) {
             values = removeLosingMoves(values);
         }
-
-        if (values.isEmpty()) {  // this means there are no moves left that are not losing moves
-            return getLastLosingMove();
-        }
-        if (moveCount % 2 == 0) {
+        if (moveCount % 2 != 0) {
             return findMax(values);
         } else {
             return findMin(values);
@@ -314,6 +349,10 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
 
     private Map.Entry<Integer, Integer> getLastLosingMove() {
         List<Integer> finalMoves = findNonNullRows(fields);
+        if (finalMoves.size() == 0) {
+            finalMoves.add(lastPossibleRow);
+            System.out.println("I was here");
+        }
         Map<Integer, Integer> finalMovesMap = new HashMap<>();
         finalMovesMap.put(finalMoves.get(0), 0);
         Map.Entry<Integer, Integer> finalMove = null;
@@ -510,6 +549,9 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
                 case 2:
                     comboValue = 2_000;
                     break;
+                case 3:
+                    comboValue = 2_000;
+                    break;
             }
         } else if (comboLength == 2 && fourInThisLineStillPossible && moveCount < 2) {   // 2 in a row is only useful if it happens in the first move -> moveCount == 0 (or the first move of the enemy -> moveCount == 1)
             comboValue = 500;
@@ -590,9 +632,9 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
     protected void logCustom(String str) {
     }
 
-    private void sleep() {
+    private void sleep(int time) {
         try {
-            Thread.sleep(1000);
+            Thread.sleep(time);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
