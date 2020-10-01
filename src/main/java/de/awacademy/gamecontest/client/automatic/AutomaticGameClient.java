@@ -28,7 +28,7 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
     private boolean iAmYellow;
     private int myValue;
     private int enemyValue;
-    private int numCalculateMovesAhead = 5;
+    private int numCalculateMovesAhead = 6;
     private int firstMoveRow;
     private int firstMoveCol;
     private int secondMoveRow;
@@ -39,6 +39,10 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
     private int fourthMoveCol;
     private int fifthMoveRow;
     private int fifthMoveCol;
+    private int sixthMoveRow;
+    private int sixthMoveCol;
+    private int seventhMoveRow;
+    private int seventhMoveCol;
     private int latestMoveRow;
     private boolean stopRecursion;
     List<Integer> losingMoves = new ArrayList();
@@ -48,6 +52,8 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
     Map<Integer, Integer> thirdNodeValues = new HashMap<>();   // first Integer (Key) = col of that move, second Integer (value) = the calculated value of that move. exp. (2, 50)
     Map<Integer, Integer> fourthNodeValues = new HashMap<>();   // first Integer (Key) = col of that move, second Integer (value) = the calculated value of that move. exp. (2, 50)
     Map<Integer, Integer> fifthNodeValues = new HashMap<>();   // first Integer (Key) = col of that move, second Integer (value) = the calculated value of that move. exp. (2, 50)
+    Map<Integer, Integer> sixthNodeValues = new HashMap<>();   // first Integer (Key) = col of that move, second Integer (value) = the calculated value of that move. exp. (2, 50)
+    Map<Integer, Integer> seventhNodeValues = new HashMap<>();   // first Integer (Key) = col of that move, second Integer (value) = the calculated value of that move. exp. (2, 50)
     Map<Integer, Integer> lastNodeValues = new HashMap<>();   // first Integer (Key) = col of that move, second Integer (value) = the calculated value of that move. exp. (2, 50)
     private boolean fourInThisLineStillPossible;
     private int enemyCanWinInCol;
@@ -120,7 +126,7 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
             player2 = player;
             if (iAmYellow) {
 //                move(3);
-                move(0);
+                move(3);
             }
         }
     }
@@ -258,8 +264,20 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
                     return;
                 }
 
+            } else if (moveCount == 5) {
+//                checkFirstMove(fields, possibleMoves, col, moveCount);
+                System.out.println("############################## New Move 6 (enemy) ##################################");
+                sixthMoveRow = latestMoveRow;
+                sixthMoveCol = col;
+
+                try {
+                    sixthNodeValues.put(col, checkNextMoves(fields, moveCount + 1).getValue());
+                } catch (NullPointerException e) {
+                    System.out.println("Problem in fourth Node" + e);
+                    return;
+                }
             } else if (moveCount == numCalculateMovesAhead) {
-                int value = checkCombos(fields, possibleMoves.get(col), col, moveCount, enemyValue);
+                int value = checkCombos(fields, possibleMoves.get(col), col, moveCount, myValue);
                 lastNodeValues.put(col, value);
 
                 System.out.println("value: " + value);
@@ -294,7 +312,6 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
                 bestMove = findValueOfBestMove(firstNodeValues, moveCount, bestMove);
                 if (bestMove == null) {  // this means there are no moves left that are not losing moves
                     bestMove = getLastLosingMove();
-
                 }
                 System.out.println("bestMove: " + bestMove);
                 System.out.println("enemyCanWinInCol: " + enemyCanWinInCol);
@@ -336,10 +353,12 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
                 removeMove(fields, fourthMoveRow, fourthMoveCol, possibleMoves);
                 break;
             case 5:
-                bestMove = findValueOfBestMove(lastNodeValues, moveCount, bestMove);
-                myBestThirdMove = bestMove.getKey();
-                myBestThirdMoveValue = bestMove.getValue();
+                bestMove = findValueOfBestMove(sixthNodeValues, moveCount, bestMove);
                 removeMove(fields, fifthMoveRow, fifthMoveCol, possibleMoves);
+                break;
+            case 6:
+                bestMove = findValueOfBestMove(lastNodeValues, moveCount, bestMove);
+                removeMove(fields, sixthMoveRow, sixthMoveCol, possibleMoves);
                 break;
         }
         return bestMove;
