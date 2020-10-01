@@ -28,13 +28,17 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
     private boolean iAmYellow;
     private int myValue;
     private int enemyValue;
-    private int numCalculateMovesAhead = 3;
+    private int numCalculateMovesAhead = 5;
     private int firstMoveRow;
     private int firstMoveCol;
     private int secondMoveRow;
     private int secondMoveCol;
     private int thirdMoveRow;
     private int thirdMoveCol;
+    private int fourthMoveRow;
+    private int fourthMoveCol;
+    private int fifthMoveRow;
+    private int fifthMoveCol;
     private int latestMoveRow;
     private boolean stopRecursion;
     List<Integer> losingMoves = new ArrayList();
@@ -42,6 +46,8 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
     Map<Integer, Integer> firstNodeValues = new HashMap<>();   // first Integer (Key) = col of that move, second Integer (value) = the calculated value of that move. exp. (2, 50)
     Map<Integer, Integer> secondNodeValues = new HashMap<>();   // first Integer (Key) = col of that move, second Integer (value) = the calculated value of that move. exp. (2, 50)
     Map<Integer, Integer> thirdNodeValues = new HashMap<>();   // first Integer (Key) = col of that move, second Integer (value) = the calculated value of that move. exp. (2, 50)
+    Map<Integer, Integer> fourthNodeValues = new HashMap<>();   // first Integer (Key) = col of that move, second Integer (value) = the calculated value of that move. exp. (2, 50)
+    Map<Integer, Integer> fifthNodeValues = new HashMap<>();   // first Integer (Key) = col of that move, second Integer (value) = the calculated value of that move. exp. (2, 50)
     Map<Integer, Integer> lastNodeValues = new HashMap<>();   // first Integer (Key) = col of that move, second Integer (value) = the calculated value of that move. exp. (2, 50)
     private boolean fourInThisLineStillPossible;
     private int enemyCanWinInCol;
@@ -51,6 +57,10 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
     private int myBestSecondMove;
     private int myBestThirdMoveValue;
     private int myBestThirdMove;
+    private int enemyBestSecondMoveValue;
+    private int enemyBestSecondMove;
+    private int myBestFifthMoveValue;
+    private int myBestFifthMove;
     private int lastPossibleRow;
 
 
@@ -135,6 +145,8 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
         firstNodeValues.clear();
         secondNodeValues.clear();
         thirdNodeValues.clear();
+        fourthNodeValues.clear();
+        fifthNodeValues.clear();
         lastNodeValues.clear();
         losingMoves.clear();
         stopRecursion = false;
@@ -144,6 +156,8 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
         secondMoveRow = -1;
         thirdMoveCol = -1;
         thirdMoveRow = -1;
+        fourthMoveCol = -1;
+        fourthMoveRow = -1;
         latestMoveRow = -1;
         enemyCanWinInCol = -1;
     }
@@ -211,12 +225,38 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
                 thirdMoveRow = latestMoveRow;
                 thirdMoveCol = col;
 
-                    try {
-                        thirdNodeValues.put(col, checkNextMoves(fields, moveCount + 1).getValue());
-                    } catch (NullPointerException e) {
-                        System.out.println("Problem in third Node" + e);
-                        return;
-                    }
+                try {
+                    thirdNodeValues.put(col, checkNextMoves(fields, moveCount + 1).getValue());
+                } catch (NullPointerException e) {
+                    System.out.println("Problem in third Node" + e);
+                    return;
+                }
+
+            } else if (moveCount == 3) {
+//                checkFirstMove(fields, possibleMoves, col, moveCount);
+                System.out.println("############################## New Move 4 (enemy) ##################################");
+                fourthMoveRow = latestMoveRow;
+                fourthMoveCol = col;
+
+                try {
+                    fourthNodeValues.put(col, checkNextMoves(fields, moveCount + 1).getValue());
+                } catch (NullPointerException e) {
+                    System.out.println("Problem in fourth Node" + e);
+                    return;
+                }
+
+            } else if (moveCount == 4) {
+//                checkFirstMove(fields, possibleMoves, col, moveCount);
+                System.out.println("############################## New Move 5 (me) ##################################");
+                fifthMoveRow = latestMoveRow;
+                fifthMoveCol = col;
+
+                try {
+                    fifthNodeValues.put(col, checkNextMoves(fields, moveCount + 1).getValue());
+                } catch (NullPointerException e) {
+                    System.out.println("Problem in fifth Node" + e);
+                    return;
+                }
 
             } else if (moveCount == numCalculateMovesAhead) {
                 int value = checkCombos(fields, possibleMoves.get(col), col, moveCount, enemyValue);
@@ -284,10 +324,22 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
                 removeMove(fields, secondMoveRow, secondMoveCol, possibleMoves);
                 break;
             case 3:
+                bestMove = findValueOfBestMove(fourthNodeValues, moveCount, bestMove);
+                enemyBestSecondMove = bestMove.getKey();
+                enemyBestSecondMoveValue = bestMove.getValue();
+                removeMove(fields, thirdMoveRow, thirdMoveCol, possibleMoves);
+                break;
+            case 4:
+                bestMove = findValueOfBestMove(fifthNodeValues, moveCount, bestMove);
+                myBestThirdMove = bestMove.getKey();
+                myBestThirdMoveValue = bestMove.getValue();
+                removeMove(fields, fourthMoveRow, fourthMoveCol, possibleMoves);
+                break;
+            case 5:
                 bestMove = findValueOfBestMove(lastNodeValues, moveCount, bestMove);
                 myBestThirdMove = bestMove.getKey();
                 myBestThirdMoveValue = bestMove.getValue();
-                removeMove(fields, thirdMoveRow, thirdMoveCol, possibleMoves);
+                removeMove(fields, fifthMoveRow, fifthMoveCol, possibleMoves);
                 break;
         }
         return bestMove;
