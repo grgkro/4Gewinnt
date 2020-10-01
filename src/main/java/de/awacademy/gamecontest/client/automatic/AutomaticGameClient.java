@@ -617,11 +617,8 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
                 case 1:
                     comboValue = 10_000;
                     break;
-                case 2:
-                    comboValue = 2_000;
-                    break;
-                case 3:
-                    comboValue = 2_000;
+                case 6:
+                    comboValue = 1_000;
                     break;
             }
         } else if (comboLength == 2 && fourInThisLineStillPossible && moveCount < 2) {   // 2 in a row is only useful if it happens in the first move -> moveCount == 0 (or the first move of the enemy -> moveCount == 1)
