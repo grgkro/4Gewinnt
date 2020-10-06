@@ -52,6 +52,8 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
     private int myBestThirdMoveValue;
     private int myBestThirdMove;
     private int lastPossibleRow;
+    private int gapCol;
+    private int gapRow;
 
 
 //    private int[][] savedGame = [{-1 -1 -1 -1 -1}]
@@ -110,7 +112,7 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
             player2 = player;
             if (iAmYellow) {
 //                move(3);
-                move(0);
+                move(3);
             }
         }
     }
@@ -378,8 +380,14 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
     private Map.Entry<Integer, Integer> findMax(Map<Integer, Integer> values) {
         Map.Entry<Integer, Integer> maxEntry = null;
 
+
         for (Map.Entry<Integer, Integer> entry : values.entrySet()) {
             if (maxEntry == null || entry.getValue().compareTo(maxEntry.getValue()) > 0) {
+                maxEntry = entry;
+            }
+        }
+        for (Map.Entry<Integer, Integer> entry : values.entrySet()) {
+            if (entry.getValue().compareTo(maxEntry.getValue()) == 0) {
                 maxEntry = entry;
             }
         }
@@ -393,6 +401,14 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
         value = checkCombosVertically(fields, row, firstMoveRow, col, value, moveCount, checkComboForPlayer);
         value = checkCombosDiagonallyLeftDownToRightUp(fields, row, firstMoveRow, value, moveCount, checkComboForPlayer);
         value = checkCombosDiagonallyLeftUpToRightDown(fields, value, moveCount, checkComboForPlayer);
+        value = addPointsForCentralColumns(col, value);
+        return value;
+    }
+
+    private int addPointsForCentralColumns(int col, int value) {
+        if (col > (GameConstants.COL_COUNT / 2 - 2) && col < (GameConstants.COL_COUNT / 2 + 2)) {
+            value = value + 100;
+        }
         return value;
     }
 
@@ -425,12 +441,18 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
                 return ++comboLength;
             } else if (fields[y][x] == enemyValue) {
                 fourInThisLineStillPossible = false;
+            } else {
+                gapCol = x;
+                gapRow = y;
             }
         } else {
             if (fields[y][x] == enemyValue) {
                 return ++comboLength;
             } else if (fields[y][x] == myValue) {
                 fourInThisLineStillPossible = false;
+            } else {
+                gapCol = x;
+                gapRow = y;
             }
         }
         return comboLength;
@@ -553,6 +575,13 @@ public class AutomaticGameClient extends GameClient implements GameModelListener
                     comboValue = 2_000;
                     break;
             }
+            // it also more valuable, if there is a gap underneath the missing 4th stone (this way the enemy can't immediately block it and eventually someone has to fill the gap by Zugzwang)
+            if (gapRow > 0) {
+                if (fields[gapRow - 1][gapCol] != 1 && fields[gapRow - 1][gapCol] != 2) {
+                    comboValue = comboValue + 5_000;
+                }
+            }
+
         } else if (comboLength == 2 && fourInThisLineStillPossible && moveCount < 2) {   // 2 in a row is only useful if it happens in the first move -> moveCount == 0 (or the first move of the enemy -> moveCount == 1)
             comboValue = 500;
         }
